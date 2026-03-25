@@ -23,12 +23,29 @@ import type {
   Swap2Params,
 } from "./types";
 
+type OptionalSigner = TransactionSigner | null | undefined;
+type OptionalAddress = Address | null | undefined;
+
 function signerAddress(signer: TransactionSigner): string {
   return signer.address;
 }
 
 function addressString(value: Address): string {
   return value;
+}
+
+function optionalSignerAddress(signer: OptionalSigner): string | undefined {
+  return signer ? signerAddress(signer) : undefined;
+}
+
+function optionalAddressString(
+  value: OptionalAddress,
+): string | null | undefined {
+  if (value === null) {
+    return null;
+  }
+
+  return value ? addressString(value) : undefined;
 }
 
 function assertLegacyBridge(
@@ -44,8 +61,10 @@ function assertLegacyBridge(
   );
 }
 
-function planSigners(...signers: TransactionSigner[]): readonly TransactionSigner[] {
-  return signers;
+function planSigners(...signers: readonly OptionalSigner[]): readonly TransactionSigner[] {
+  return signers.filter(
+    (signer): signer is TransactionSigner => signer !== undefined && signer !== null,
+  );
 }
 
 export class CpAmmKitClient {
@@ -242,10 +261,8 @@ export class CpAmmKitClient {
       tokenBVault: addressString(params.tokenBVault),
       tokenAProgram: addressString(params.tokenAProgram),
       tokenBProgram: addressString(params.tokenBProgram),
-      referralTokenAccount: params.referralTokenAccount
-        ? addressString(params.referralTokenAccount)
-        : null,
-      receiver: params.receiver ? addressString(params.receiver) : undefined,
+      referralTokenAccount: optionalAddressString(params.referralTokenAccount) ?? null,
+      receiver: optionalAddressString(params.receiver),
       poolState: params.poolState,
       ...("amountIn" in params
         ? {

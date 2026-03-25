@@ -11,7 +11,9 @@ function deduplicatePlanSigners(
 ): readonly TransactionSigner[] {
   const deduplicated = new Map<string, TransactionSigner>();
   for (const signer of signers) {
-    deduplicated.set(signer.address, signer);
+    if (!deduplicated.has(signer.address)) {
+      deduplicated.set(signer.address, signer);
+    }
   }
 
   return Array.from(deduplicated.values());
