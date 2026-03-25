@@ -10,6 +10,7 @@ import {
 import { LegacyKitBridge } from "../internal/legacyKitBridge";
 import { adaptLegacyPoolResult, adaptLegacyTransaction } from "./adapters/legacy";
 import { getDefaultRpcSubscriptionsUrl } from "./helpers";
+import * as readServices from "./services";
 import type {
   AddLiquidityParams,
   ClaimPositionFee2Params,
@@ -34,7 +35,14 @@ import type {
   CreatePositionAndAddLiquidityParams,
   CreatePositionParams,
   FromRpcUrlOptions,
+  KitAccountRecord,
+  KitConfigState,
+  KitDecodedPoolFees,
+  KitPoolState,
+  KitPositionState,
   KitTransactionPlan,
+  KitUserPositionRecord,
+  KitVestingSnapshot,
   RemoveAllLiquidityParams,
   RemoveLiquidityParams,
   SplitPosition2Params,
@@ -153,6 +161,87 @@ export class CpAmmKitClient {
       },
       legacyBridge,
     );
+  }
+
+  async fetchConfigState(config: Address): Promise<KitConfigState> {
+    return await readServices.fetchConfigState(this.rpc, config);
+  }
+
+  async fetchPoolState(pool: Address): Promise<KitPoolState> {
+    return await readServices.fetchPoolState(this.rpc, pool);
+  }
+
+  async fetchPoolStatesByTokenAMint(
+    tokenAMint: Address,
+  ): Promise<Array<KitAccountRecord<KitPoolState>>> {
+    return await readServices.fetchPoolStatesByTokenAMint(this.rpc, tokenAMint);
+  }
+
+  async fetchPoolFees(pool: Address): Promise<KitDecodedPoolFees> {
+    return await readServices.fetchPoolFees(this.rpc, pool);
+  }
+
+  async fetchPositionState(position: Address): Promise<KitPositionState> {
+    return await readServices.fetchPositionState(this.rpc, position);
+  }
+
+  async getMultipleConfigs(
+    configs: readonly Address[],
+  ): Promise<KitConfigState[]> {
+    return await readServices.getMultipleConfigs(this.rpc, configs);
+  }
+
+  async getMultiplePools(pools: readonly Address[]): Promise<KitPoolState[]> {
+    return await readServices.getMultiplePools(this.rpc, pools);
+  }
+
+  async getMultiplePositions(
+    positions: readonly Address[],
+  ): Promise<KitPositionState[]> {
+    return await readServices.getMultiplePositions(this.rpc, positions);
+  }
+
+  async getAllConfigs(): Promise<Array<KitAccountRecord<KitConfigState>>> {
+    return await readServices.getAllConfigs(this.rpc);
+  }
+
+  async getStaticConfigs(): Promise<Array<KitAccountRecord<KitConfigState>>> {
+    return await readServices.getStaticConfigs(this.rpc);
+  }
+
+  async getAllPools(): Promise<Array<KitAccountRecord<KitPoolState>>> {
+    return await readServices.getAllPools(this.rpc);
+  }
+
+  async getAllPositions(): Promise<Array<KitAccountRecord<KitPositionState>>> {
+    return await readServices.getAllPositions(this.rpc);
+  }
+
+  async getAllPositionsByPool(
+    pool: Address,
+  ): Promise<Array<KitAccountRecord<KitPositionState>>> {
+    return await readServices.getAllPositionsByPool(this.rpc, pool);
+  }
+
+  async getPositionsByUser(user: Address): Promise<KitUserPositionRecord[]> {
+    return await readServices.getPositionsByUser(this.rpc, user);
+  }
+
+  async getUserPositionByPool(
+    pool: Address,
+    user: Address,
+  ): Promise<KitUserPositionRecord[]> {
+    return await readServices.getUserPositionByPool(this.rpc, pool, user);
+  }
+
+  async getAllVestingsByPosition(
+    position: Address,
+  ): Promise<readonly KitVestingSnapshot[]> {
+    return await readServices.getAllVestingsByPosition(this.rpc, position);
+  }
+
+  async isPoolExist(pool: Address): Promise<boolean> {
+    return await readServices.isPoolExist(this.rpc, pool);
   }
 
   async createCustomPool(
