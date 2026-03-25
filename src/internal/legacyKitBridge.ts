@@ -7,13 +7,21 @@ import { derivePoolAddress, derivePositionAddress } from "../pda";
 import type { KitInstruction } from "../kit/types";
 import type {
   AddLiquidityParams,
+  ClosePositionParams,
   CreatePoolParams,
   CreatePositionAndAddLiquidity,
   CreatePositionParams,
   InitializeCustomizeablePoolParams,
   InitializeCustomizeablePoolWithDynamicConfigParams,
+  LockPositionParams,
+  MergePositionParams,
+  PermanentLockParams,
+  RefreshVestingParams,
+  RemoveAllLiquidityAndClosePositionParams,
   RemoveAllLiquidityParams,
   RemoveLiquidityParams,
+  SplitPosition2Params,
+  SplitPositionParams,
   Swap2Params,
 } from "../types";
 
@@ -148,6 +156,116 @@ type LegacyRemoveAllLiquidityParams = Omit<
   "liquidityDelta"
 >;
 
+type LegacyRemoveAllLiquidityAndClosePositionParams = {
+  owner: AddressLike;
+  position: AddressLike;
+  positionNftAccount: AddressLike;
+  poolState: unknown;
+  positionState: unknown;
+  tokenAAmountThreshold: BN;
+  tokenBAmountThreshold: BN;
+  vestings: readonly LegacyKitVestingSnapshot[];
+  currentPoint: BN;
+};
+
+type LegacyLockPositionParams =
+  | {
+      owner: AddressLike;
+      payer: AddressLike;
+      position: AddressLike;
+      positionNftAccount: AddressLike;
+      pool: AddressLike;
+      cliffPoint: BN | null;
+      periodFrequency: BN;
+      cliffUnlockLiquidity: BN;
+      liquidityPerPeriod: BN;
+      numberOfPeriod: number;
+      innerPosition?: false;
+      vestingAccount: AddressLike;
+    }
+  | {
+      owner: AddressLike;
+      position: AddressLike;
+      positionNftAccount: AddressLike;
+      pool: AddressLike;
+      cliffPoint: BN | null;
+      periodFrequency: BN;
+      cliffUnlockLiquidity: BN;
+      liquidityPerPeriod: BN;
+      numberOfPeriod: number;
+      innerPosition: true;
+      payer?: never;
+      vestingAccount?: never;
+    };
+
+type LegacyPermanentLockPositionParams = {
+  owner: AddressLike;
+  position: AddressLike;
+  positionNftAccount: AddressLike;
+  pool: AddressLike;
+  unlockedLiquidity: BN;
+};
+
+type LegacyRefreshVestingParams = {
+  owner: AddressLike;
+  position: AddressLike;
+  positionNftAccount: AddressLike;
+  pool: AddressLike;
+  vestingAccounts: readonly AddressLike[];
+};
+
+type LegacyClosePositionParams = {
+  owner: AddressLike;
+  pool: AddressLike;
+  position: AddressLike;
+  positionNftMint: AddressLike;
+  positionNftAccount: AddressLike;
+};
+
+type LegacyMergePositionParams = {
+  owner: AddressLike;
+  positionA: AddressLike;
+  positionB: AddressLike;
+  poolState: unknown;
+  positionBNftAccount: AddressLike;
+  positionANftAccount: AddressLike;
+  positionBState: unknown;
+  tokenAAmountAddLiquidityThreshold: BN;
+  tokenBAmountAddLiquidityThreshold: BN;
+  tokenAAmountRemoveLiquidityThreshold: BN;
+  tokenBAmountRemoveLiquidityThreshold: BN;
+  positionBVestings: readonly LegacyKitVestingSnapshot[];
+  currentPoint: BN;
+};
+
+type LegacySplitPositionParams = {
+  firstPositionOwner: AddressLike;
+  secondPositionOwner: AddressLike;
+  pool: AddressLike;
+  firstPosition: AddressLike;
+  firstPositionNftAccount: AddressLike;
+  secondPosition: AddressLike;
+  secondPositionNftAccount: AddressLike;
+  permanentLockedLiquidityPercentage: number;
+  unlockedLiquidityPercentage: number;
+  feeAPercentage: number;
+  feeBPercentage: number;
+  reward0Percentage: number;
+  reward1Percentage: number;
+  innerVestingLiquidityPercentage: number;
+};
+
+type LegacySplitPosition2Params = {
+  firstPositionOwner: AddressLike;
+  secondPositionOwner: AddressLike;
+  pool: AddressLike;
+  firstPosition: AddressLike;
+  firstPositionNftAccount: AddressLike;
+  secondPosition: AddressLike;
+  secondPositionNftAccount: AddressLike;
+  numerator: number;
+};
+
 type LegacySwap2Params = {
   payer: AddressLike;
   pool: AddressLike;
@@ -195,6 +313,12 @@ function toLegacyVestings(
     vestingState:
       vestingState as RemoveLiquidityParams["vestings"][number]["vestingState"],
   }));
+}
+
+function toLegacyVestingAccounts(
+  vestingAccounts: readonly AddressLike[],
+): RefreshVestingParams["vestingAccounts"] {
+  return vestingAccounts.map(toPublicKey);
 }
 
 export class LegacyKitBridge {
@@ -421,6 +545,196 @@ export class LegacyKitBridge {
     return {
       instructions: toKitInstructions(
         await this.client.removeAllLiquidity(removeAllLiquidityParams),
+      ),
+    };
+  }
+
+  async removeAllLiquidityAndClosePosition(
+    params: LegacyRemoveAllLiquidityAndClosePositionParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const removeAllLiquidityAndClosePositionParams: RemoveAllLiquidityAndClosePositionParams =
+      {
+        owner: toPublicKey(params.owner),
+        position: toPublicKey(params.position),
+        positionNftAccount: toPublicKey(params.positionNftAccount),
+        poolState:
+          params.poolState as RemoveAllLiquidityAndClosePositionParams["poolState"],
+        positionState:
+          params.positionState as RemoveAllLiquidityAndClosePositionParams["positionState"],
+        tokenAAmountThreshold: params.tokenAAmountThreshold,
+        tokenBAmountThreshold: params.tokenBAmountThreshold,
+        vestings: toLegacyVestings(params.vestings),
+        currentPoint: params.currentPoint,
+      };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.removeAllLiquidityAndClosePosition(
+          removeAllLiquidityAndClosePositionParams,
+        ),
+      ),
+    };
+  }
+
+  async lockPosition(params: LegacyLockPositionParams): Promise<LegacyKitPlanSeed> {
+    const lockPositionParams: LockPositionParams =
+      "innerPosition" in params && params.innerPosition
+        ? {
+            owner: toPublicKey(params.owner),
+            payer: toPublicKey(params.owner),
+            position: toPublicKey(params.position),
+            positionNftAccount: toPublicKey(params.positionNftAccount),
+            pool: toPublicKey(params.pool),
+            cliffPoint: params.cliffPoint,
+            periodFrequency: params.periodFrequency,
+            cliffUnlockLiquidity: params.cliffUnlockLiquidity,
+            liquidityPerPeriod: params.liquidityPerPeriod,
+            numberOfPeriod: params.numberOfPeriod,
+            innerPosition: true,
+          }
+        : {
+            owner: toPublicKey(params.owner),
+            payer: toPublicKey(params.payer),
+            position: toPublicKey(params.position),
+            positionNftAccount: toPublicKey(params.positionNftAccount),
+            pool: toPublicKey(params.pool),
+            cliffPoint: params.cliffPoint,
+            periodFrequency: params.periodFrequency,
+            cliffUnlockLiquidity: params.cliffUnlockLiquidity,
+            liquidityPerPeriod: params.liquidityPerPeriod,
+            numberOfPeriod: params.numberOfPeriod,
+            innerPosition: false,
+            vestingAccount: toPublicKey(params.vestingAccount),
+          };
+
+    return {
+      instructions: toKitInstructions(await this.client.lockPosition(lockPositionParams)),
+    };
+  }
+
+  async permanentLockPosition(
+    params: LegacyPermanentLockPositionParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const permanentLockPositionParams: PermanentLockParams = {
+      owner: toPublicKey(params.owner),
+      position: toPublicKey(params.position),
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+      pool: toPublicKey(params.pool),
+      unlockedLiquidity: params.unlockedLiquidity,
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.permanentLockPosition(permanentLockPositionParams),
+      ),
+    };
+  }
+
+  async refreshVesting(
+    params: LegacyRefreshVestingParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const refreshVestingParams: RefreshVestingParams = {
+      owner: toPublicKey(params.owner),
+      position: toPublicKey(params.position),
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+      pool: toPublicKey(params.pool),
+      vestingAccounts: toLegacyVestingAccounts(params.vestingAccounts),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.refreshVesting(refreshVestingParams),
+      ),
+    };
+  }
+
+  async closePosition(
+    params: LegacyClosePositionParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const closePositionParams: ClosePositionParams = {
+      owner: toPublicKey(params.owner),
+      pool: toPublicKey(params.pool),
+      position: toPublicKey(params.position),
+      positionNftMint: toPublicKey(params.positionNftMint),
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.closePosition(closePositionParams),
+      ),
+    };
+  }
+
+  async mergePosition(params: LegacyMergePositionParams): Promise<LegacyKitPlanSeed> {
+    const mergePositionParams: MergePositionParams = {
+      owner: toPublicKey(params.owner),
+      positionA: toPublicKey(params.positionA),
+      positionB: toPublicKey(params.positionB),
+      poolState: params.poolState as MergePositionParams["poolState"],
+      positionBNftAccount: toPublicKey(params.positionBNftAccount),
+      positionANftAccount: toPublicKey(params.positionANftAccount),
+      positionBState: params.positionBState as MergePositionParams["positionBState"],
+      tokenAAmountAddLiquidityThreshold: params.tokenAAmountAddLiquidityThreshold,
+      tokenBAmountAddLiquidityThreshold: params.tokenBAmountAddLiquidityThreshold,
+      tokenAAmountRemoveLiquidityThreshold:
+        params.tokenAAmountRemoveLiquidityThreshold,
+      tokenBAmountRemoveLiquidityThreshold:
+        params.tokenBAmountRemoveLiquidityThreshold,
+      positionBVestings: toLegacyVestings(params.positionBVestings),
+      currentPoint: params.currentPoint,
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.mergePosition(mergePositionParams),
+      ),
+    };
+  }
+
+  async splitPosition(params: LegacySplitPositionParams): Promise<LegacyKitPlanSeed> {
+    const splitPositionParams: SplitPositionParams = {
+      firstPositionOwner: toPublicKey(params.firstPositionOwner),
+      secondPositionOwner: toPublicKey(params.secondPositionOwner),
+      pool: toPublicKey(params.pool),
+      firstPosition: toPublicKey(params.firstPosition),
+      firstPositionNftAccount: toPublicKey(params.firstPositionNftAccount),
+      secondPosition: toPublicKey(params.secondPosition),
+      secondPositionNftAccount: toPublicKey(params.secondPositionNftAccount),
+      permanentLockedLiquidityPercentage:
+        params.permanentLockedLiquidityPercentage,
+      unlockedLiquidityPercentage: params.unlockedLiquidityPercentage,
+      feeAPercentage: params.feeAPercentage,
+      feeBPercentage: params.feeBPercentage,
+      reward0Percentage: params.reward0Percentage,
+      reward1Percentage: params.reward1Percentage,
+      innerVestingLiquidityPercentage: params.innerVestingLiquidityPercentage,
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.splitPosition(splitPositionParams),
+      ),
+    };
+  }
+
+  async splitPosition2(
+    params: LegacySplitPosition2Params,
+  ): Promise<LegacyKitPlanSeed> {
+    const splitPosition2Params: SplitPosition2Params = {
+      firstPositionOwner: toPublicKey(params.firstPositionOwner),
+      secondPositionOwner: toPublicKey(params.secondPositionOwner),
+      pool: toPublicKey(params.pool),
+      firstPosition: toPublicKey(params.firstPosition),
+      firstPositionNftAccount: toPublicKey(params.firstPositionNftAccount),
+      secondPosition: toPublicKey(params.secondPosition),
+      secondPositionNftAccount: toPublicKey(params.secondPositionNftAccount),
+      numerator: params.numerator,
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.splitPosition2(splitPosition2Params),
       ),
     };
   }

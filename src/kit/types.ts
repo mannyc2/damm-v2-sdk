@@ -178,6 +178,110 @@ export type RemoveAllLiquidityParams = Omit<
   "liquidityDelta"
 >;
 
+export type RemoveAllLiquidityAndClosePositionParams = {
+  owner: TransactionSigner;
+  position: Address;
+  positionNftAccount: Address;
+  poolState: unknown;
+  positionState: unknown;
+  tokenAAmountThreshold: BN;
+  tokenBAmountThreshold: BN;
+  vestings: readonly KitVestingSnapshot[];
+  currentPoint: BN;
+};
+
+type LockPositionSharedParams = {
+  owner: TransactionSigner;
+  position: Address;
+  positionNftAccount: Address;
+  pool: Address;
+  cliffPoint: BN | null;
+  periodFrequency: BN;
+  cliffUnlockLiquidity: BN;
+  liquidityPerPeriod: BN;
+  numberOfPeriod: number;
+};
+
+export type LockPositionParams =
+  | (LockPositionSharedParams & {
+      payer: TransactionSigner;
+      innerPosition?: false;
+      vestingAccount: TransactionSigner;
+    })
+  | (LockPositionSharedParams & {
+      payer?: never;
+      innerPosition: true;
+      vestingAccount?: never;
+    });
+
+export type PermanentLockPositionParams = {
+  owner: TransactionSigner;
+  position: Address;
+  positionNftAccount: Address;
+  pool: Address;
+  unlockedLiquidity: BN;
+};
+
+export type RefreshVestingParams = {
+  owner: Address;
+  position: Address;
+  positionNftAccount: Address;
+  pool: Address;
+  vestingAccounts: readonly Address[];
+};
+
+export type ClosePositionParams = {
+  owner: TransactionSigner;
+  pool: Address;
+  position: Address;
+  positionNftMint: Address;
+  positionNftAccount: Address;
+};
+
+export type MergePositionParams = {
+  owner: TransactionSigner;
+  positionA: Address;
+  positionB: Address;
+  poolState: unknown;
+  positionBNftAccount: Address;
+  positionANftAccount: Address;
+  positionBState: unknown;
+  tokenAAmountAddLiquidityThreshold: BN;
+  tokenBAmountAddLiquidityThreshold: BN;
+  tokenAAmountRemoveLiquidityThreshold: BN;
+  tokenBAmountRemoveLiquidityThreshold: BN;
+  positionBVestings: readonly KitVestingSnapshot[];
+  currentPoint: BN;
+};
+
+export type SplitPositionParams = {
+  firstPositionOwner: TransactionSigner;
+  secondPositionOwner: TransactionSigner;
+  pool: Address;
+  firstPosition: Address;
+  firstPositionNftAccount: Address;
+  secondPosition: Address;
+  secondPositionNftAccount: Address;
+  permanentLockedLiquidityPercentage: number;
+  unlockedLiquidityPercentage: number;
+  feeAPercentage: number;
+  feeBPercentage: number;
+  reward0Percentage: number;
+  reward1Percentage: number;
+  innerVestingLiquidityPercentage: number;
+};
+
+export type SplitPosition2Params = {
+  firstPositionOwner: TransactionSigner;
+  secondPositionOwner: TransactionSigner;
+  pool: Address;
+  firstPosition: Address;
+  firstPositionNftAccount: Address;
+  secondPosition: Address;
+  secondPositionNftAccount: Address;
+  numerator: number;
+};
+
 export type Swap2Params = {
   payer: TransactionSigner;
   pool: Address;
