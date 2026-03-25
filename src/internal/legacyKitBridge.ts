@@ -7,12 +7,18 @@ import { derivePoolAddress, derivePositionAddress } from "../pda";
 import type { KitInstruction } from "../kit/types";
 import type {
   AddLiquidityParams,
+  ClaimPositionFeeParams,
+  ClaimPositionFeeParams2,
+  ClaimRewardParams,
   ClosePositionParams,
   CreatePoolParams,
   CreatePositionAndAddLiquidity,
   CreatePositionParams,
+  FundRewardParams,
   InitializeCustomizeablePoolParams,
   InitializeCustomizeablePoolWithDynamicConfigParams,
+  InitializeAndFundReward,
+  InitializeRewardParams,
   LockPositionParams,
   MergePositionParams,
   PermanentLockParams,
@@ -23,6 +29,9 @@ import type {
   SplitPosition2Params,
   SplitPositionParams,
   Swap2Params,
+  UpdateRewardDurationParams,
+  UpdateRewardFunderParams,
+  WithdrawIneligibleRewardParams,
 } from "../types";
 
 type AddressLike = string;
@@ -266,6 +275,94 @@ type LegacySplitPosition2Params = {
   numerator: number;
 };
 
+type LegacyClaimPositionFeeParams = {
+  owner: AddressLike;
+  position: AddressLike;
+  pool: AddressLike;
+  positionNftAccount: AddressLike;
+  tokenAMint: AddressLike;
+  tokenBMint: AddressLike;
+  tokenAVault: AddressLike;
+  tokenBVault: AddressLike;
+  tokenAProgram: AddressLike;
+  tokenBProgram: AddressLike;
+  receiver?: AddressLike;
+  feePayer?: AddressLike;
+  tempWSolAccount?: AddressLike;
+};
+
+type LegacyClaimPositionFee2Params = Omit<
+  LegacyClaimPositionFeeParams,
+  "receiver" | "tempWSolAccount"
+> & {
+  receiver: AddressLike;
+};
+
+type LegacyInitializeRewardParams = {
+  rewardIndex: number;
+  rewardDuration: BN;
+  pool: AddressLike;
+  rewardMint: AddressLike;
+  funder: AddressLike;
+  payer: AddressLike;
+  creator: AddressLike;
+  rewardMintProgram: AddressLike;
+};
+
+type LegacyInitializeAndFundRewardParams = {
+  rewardIndex: number;
+  rewardDuration: BN;
+  pool: AddressLike;
+  creator: AddressLike;
+  payer: AddressLike;
+  rewardMint: AddressLike;
+  carryForward: boolean;
+  amount: BN;
+  rewardMintProgram: AddressLike;
+};
+
+type LegacyUpdateRewardDurationParams = {
+  pool: AddressLike;
+  signer: AddressLike;
+  rewardIndex: number;
+  newDuration: BN;
+};
+
+type LegacyUpdateRewardFunderParams = {
+  pool: AddressLike;
+  signer: AddressLike;
+  rewardIndex: number;
+  newFunder: AddressLike;
+};
+
+type LegacyFundRewardParams = {
+  funder: AddressLike;
+  rewardIndex: number;
+  pool: AddressLike;
+  carryForward: boolean;
+  amount: BN;
+  rewardMint: AddressLike;
+  rewardVault: AddressLike;
+  rewardMintProgram: AddressLike;
+};
+
+type LegacyWithdrawIneligibleRewardParams = {
+  rewardIndex: number;
+  pool: AddressLike;
+  funder: AddressLike;
+};
+
+type LegacyClaimRewardParams = {
+  user: AddressLike;
+  position: AddressLike;
+  poolState: unknown;
+  positionState: unknown;
+  positionNftAccount: AddressLike;
+  rewardIndex: number;
+  isSkipReward: boolean;
+  feePayer?: AddressLike;
+};
+
 type LegacySwap2Params = {
   payer: AddressLike;
   pool: AddressLike;
@@ -295,6 +392,10 @@ type LegacySwap2Params = {
 
 function toPublicKey(address: AddressLike): PublicKey {
   return new PublicKey(address);
+}
+
+function toPublicKeyOrUndefined(address: AddressLike | undefined): PublicKey | undefined {
+  return address ? toPublicKey(address) : undefined;
 }
 
 function toPublicKeyOrNull(address: AddressLike | null): PublicKey | null {
@@ -735,6 +836,188 @@ export class LegacyKitBridge {
     return {
       instructions: toKitInstructions(
         await this.client.splitPosition2(splitPosition2Params),
+      ),
+    };
+  }
+
+  async claimPositionFee(
+    params: LegacyClaimPositionFeeParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const claimPositionFeeParams: ClaimPositionFeeParams = {
+      owner: toPublicKey(params.owner),
+      position: toPublicKey(params.position),
+      pool: toPublicKey(params.pool),
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+      tokenAMint: toPublicKey(params.tokenAMint),
+      tokenBMint: toPublicKey(params.tokenBMint),
+      tokenAVault: toPublicKey(params.tokenAVault),
+      tokenBVault: toPublicKey(params.tokenBVault),
+      tokenAProgram: toPublicKey(params.tokenAProgram),
+      tokenBProgram: toPublicKey(params.tokenBProgram),
+      receiver: toPublicKeyOrUndefined(params.receiver),
+      feePayer: toPublicKeyOrUndefined(params.feePayer),
+      tempWSolAccount: toPublicKeyOrUndefined(params.tempWSolAccount),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.claimPositionFee(claimPositionFeeParams),
+      ),
+    };
+  }
+
+  async claimPositionFee2(
+    params: LegacyClaimPositionFee2Params,
+  ): Promise<LegacyKitPlanSeed> {
+    const claimPositionFee2Params: ClaimPositionFeeParams2 = {
+      owner: toPublicKey(params.owner),
+      position: toPublicKey(params.position),
+      pool: toPublicKey(params.pool),
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+      tokenAMint: toPublicKey(params.tokenAMint),
+      tokenBMint: toPublicKey(params.tokenBMint),
+      tokenAVault: toPublicKey(params.tokenAVault),
+      tokenBVault: toPublicKey(params.tokenBVault),
+      tokenAProgram: toPublicKey(params.tokenAProgram),
+      tokenBProgram: toPublicKey(params.tokenBProgram),
+      receiver: toPublicKey(params.receiver),
+      feePayer: toPublicKeyOrUndefined(params.feePayer),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.claimPositionFee2(claimPositionFee2Params),
+      ),
+    };
+  }
+
+  async initializeReward(
+    params: LegacyInitializeRewardParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const initializeRewardParams: InitializeRewardParams = {
+      rewardIndex: params.rewardIndex,
+      rewardDuration: params.rewardDuration,
+      pool: toPublicKey(params.pool),
+      rewardMint: toPublicKey(params.rewardMint),
+      funder: toPublicKey(params.funder),
+      payer: toPublicKey(params.payer),
+      creator: toPublicKey(params.creator),
+      rewardMintProgram: toPublicKey(params.rewardMintProgram),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.initializeReward(initializeRewardParams),
+      ),
+    };
+  }
+
+  async initializeAndFundReward(
+    params: LegacyInitializeAndFundRewardParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const initializeAndFundRewardParams: InitializeAndFundReward = {
+      rewardIndex: params.rewardIndex,
+      rewardDuration: params.rewardDuration,
+      pool: toPublicKey(params.pool),
+      creator: toPublicKey(params.creator),
+      payer: toPublicKey(params.payer),
+      rewardMint: toPublicKey(params.rewardMint),
+      carryForward: params.carryForward,
+      amount: params.amount,
+      rewardMintProgram: toPublicKey(params.rewardMintProgram),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.initializeAndFundReward(initializeAndFundRewardParams),
+      ),
+    };
+  }
+
+  async updateRewardDuration(
+    params: LegacyUpdateRewardDurationParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const updateRewardDurationParams: UpdateRewardDurationParams = {
+      pool: toPublicKey(params.pool),
+      signer: toPublicKey(params.signer),
+      rewardIndex: params.rewardIndex,
+      newDuration: params.newDuration,
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.updateRewardDuration(updateRewardDurationParams),
+      ),
+    };
+  }
+
+  async updateRewardFunder(
+    params: LegacyUpdateRewardFunderParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const updateRewardFunderParams: UpdateRewardFunderParams = {
+      pool: toPublicKey(params.pool),
+      signer: toPublicKey(params.signer),
+      rewardIndex: params.rewardIndex,
+      newFunder: toPublicKey(params.newFunder),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.updateRewardFunder(updateRewardFunderParams),
+      ),
+    };
+  }
+
+  async fundReward(params: LegacyFundRewardParams): Promise<LegacyKitPlanSeed> {
+    const fundRewardParams: FundRewardParams = {
+      funder: toPublicKey(params.funder),
+      rewardIndex: params.rewardIndex,
+      pool: toPublicKey(params.pool),
+      carryForward: params.carryForward,
+      amount: params.amount,
+      rewardMint: toPublicKey(params.rewardMint),
+      rewardVault: toPublicKey(params.rewardVault),
+      rewardMintProgram: toPublicKey(params.rewardMintProgram),
+    };
+
+    return {
+      instructions: toKitInstructions(await this.client.fundReward(fundRewardParams)),
+    };
+  }
+
+  async withdrawIneligibleReward(
+    params: LegacyWithdrawIneligibleRewardParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const withdrawIneligibleRewardParams: WithdrawIneligibleRewardParams = {
+      rewardIndex: params.rewardIndex,
+      pool: toPublicKey(params.pool),
+      funder: toPublicKey(params.funder),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.withdrawIneligibleReward(
+          withdrawIneligibleRewardParams,
+        ),
+      ),
+    };
+  }
+
+  async claimReward(params: LegacyClaimRewardParams): Promise<LegacyKitPlanSeed> {
+    const claimRewardParams: ClaimRewardParams = {
+      user: toPublicKey(params.user),
+      position: toPublicKey(params.position),
+      poolState: params.poolState as ClaimRewardParams["poolState"],
+      positionState: params.positionState as ClaimRewardParams["positionState"],
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+      rewardIndex: params.rewardIndex,
+      isSkipReward: params.isSkipReward,
+      feePayer: toPublicKeyOrUndefined(params.feePayer),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.claimReward(claimRewardParams),
       ),
     };
   }

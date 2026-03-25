@@ -282,6 +282,94 @@ export type SplitPosition2Params = {
   numerator: number;
 };
 
+export type ClaimPositionFeeParams = {
+  owner: TransactionSigner;
+  position: Address;
+  pool: Address;
+  positionNftAccount: Address;
+  tokenAMint: Address;
+  tokenBMint: Address;
+  tokenAVault: Address;
+  tokenBVault: Address;
+  tokenAProgram: Address;
+  tokenBProgram: Address;
+  receiver?: Address;
+  feePayer?: TransactionSigner;
+  tempWSolAccount?: TransactionSigner;
+};
+
+export type ClaimPositionFee2Params = Omit<
+  ClaimPositionFeeParams,
+  "receiver" | "tempWSolAccount"
+> & {
+  receiver: Address;
+};
+
+export type InitializeRewardParams = {
+  rewardIndex: number;
+  rewardDuration: BN;
+  pool: Address;
+  rewardMint: Address;
+  funder: Address;
+  payer: TransactionSigner;
+  creator: TransactionSigner;
+  rewardMintProgram: Address;
+};
+
+export type InitializeAndFundRewardParams = {
+  rewardIndex: number;
+  rewardDuration: BN;
+  pool: Address;
+  creator: TransactionSigner;
+  payer: TransactionSigner;
+  rewardMint: Address;
+  carryForward: boolean;
+  amount: BN;
+  rewardMintProgram: Address;
+};
+
+export type UpdateRewardDurationParams = {
+  pool: Address;
+  signer: TransactionSigner;
+  rewardIndex: number;
+  newDuration: BN;
+};
+
+export type UpdateRewardFunderParams = {
+  pool: Address;
+  signer: TransactionSigner;
+  rewardIndex: number;
+  newFunder: Address;
+};
+
+export type FundRewardParams = {
+  funder: TransactionSigner;
+  rewardIndex: number;
+  pool: Address;
+  carryForward: boolean;
+  amount: BN;
+  rewardMint: Address;
+  rewardVault: Address;
+  rewardMintProgram: Address;
+};
+
+export type WithdrawIneligibleRewardParams = {
+  rewardIndex: number;
+  pool: Address;
+  funder: TransactionSigner;
+};
+
+export type ClaimRewardParams = {
+  user: TransactionSigner;
+  position: Address;
+  poolState: unknown;
+  positionState: unknown;
+  positionNftAccount: Address;
+  rewardIndex: number;
+  isSkipReward: boolean;
+  feePayer?: TransactionSigner;
+};
+
 export type Swap2Params = {
   payer: TransactionSigner;
   pool: Address;

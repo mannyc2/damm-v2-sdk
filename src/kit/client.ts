@@ -12,6 +12,9 @@ import { adaptLegacyPoolResult, adaptLegacyTransaction } from "./adapters/legacy
 import { getDefaultRpcSubscriptionsUrl } from "./helpers";
 import type {
   AddLiquidityParams,
+  ClaimPositionFee2Params,
+  ClaimPositionFeeParams,
+  ClaimRewardParams,
   ClosePositionParams,
   CpAmmKitClientOptions,
   CreatePoolParams,
@@ -20,6 +23,9 @@ import type {
   CreateCustomPoolResult,
   CreateCustomPoolWithDynamicConfigParams,
   CreateCustomPoolWithDynamicConfigResult,
+  FundRewardParams,
+  InitializeAndFundRewardParams,
+  InitializeRewardParams,
   LockPositionParams,
   MergePositionParams,
   PermanentLockPositionParams,
@@ -34,6 +40,9 @@ import type {
   SplitPosition2Params,
   SplitPositionParams,
   Swap2Params,
+  UpdateRewardDurationParams,
+  UpdateRewardFunderParams,
+  WithdrawIneligibleRewardParams,
 } from "./types";
 
 type OptionalSigner = TransactionSigner | null | undefined;
@@ -564,6 +573,194 @@ export class CpAmmKitClient {
     return adaptLegacyTransaction(
       transaction,
       planSigners(params.firstPositionOwner, params.secondPositionOwner),
+    );
+  }
+
+  async claimPositionFee(
+    params: ClaimPositionFeeParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "claimPositionFee");
+
+    const transaction = await legacyBridge.claimPositionFee({
+      owner: signerAddress(params.owner),
+      position: addressString(params.position),
+      pool: addressString(params.pool),
+      positionNftAccount: addressString(params.positionNftAccount),
+      tokenAMint: addressString(params.tokenAMint),
+      tokenBMint: addressString(params.tokenBMint),
+      tokenAVault: addressString(params.tokenAVault),
+      tokenBVault: addressString(params.tokenBVault),
+      tokenAProgram: addressString(params.tokenAProgram),
+      tokenBProgram: addressString(params.tokenBProgram),
+      receiver: optionalAddressString(params.receiver),
+      feePayer: optionalSignerAddress(params.feePayer),
+      tempWSolAccount: optionalSignerAddress(params.tempWSolAccount),
+    });
+
+    return adaptLegacyTransaction(
+      transaction,
+      planSigners(params.owner, params.feePayer, params.tempWSolAccount),
+    );
+  }
+
+  async claimPositionFee2(
+    params: ClaimPositionFee2Params,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "claimPositionFee2");
+
+    const transaction = await legacyBridge.claimPositionFee2({
+      owner: signerAddress(params.owner),
+      position: addressString(params.position),
+      pool: addressString(params.pool),
+      positionNftAccount: addressString(params.positionNftAccount),
+      tokenAMint: addressString(params.tokenAMint),
+      tokenBMint: addressString(params.tokenBMint),
+      tokenAVault: addressString(params.tokenAVault),
+      tokenBVault: addressString(params.tokenBVault),
+      tokenAProgram: addressString(params.tokenAProgram),
+      tokenBProgram: addressString(params.tokenBProgram),
+      receiver: addressString(params.receiver),
+      feePayer: optionalSignerAddress(params.feePayer),
+    });
+
+    return adaptLegacyTransaction(
+      transaction,
+      planSigners(params.owner, params.feePayer),
+    );
+  }
+
+  async initializeReward(
+    params: InitializeRewardParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "initializeReward");
+
+    const transaction = await legacyBridge.initializeReward({
+      rewardIndex: params.rewardIndex,
+      rewardDuration: params.rewardDuration,
+      pool: addressString(params.pool),
+      rewardMint: addressString(params.rewardMint),
+      funder: addressString(params.funder),
+      payer: signerAddress(params.payer),
+      creator: signerAddress(params.creator),
+      rewardMintProgram: addressString(params.rewardMintProgram),
+    });
+
+    return adaptLegacyTransaction(
+      transaction,
+      planSigners(params.creator, params.payer),
+    );
+  }
+
+  async initializeAndFundReward(
+    params: InitializeAndFundRewardParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(
+      this.legacyBridge,
+      "initializeAndFundReward",
+    );
+
+    const transaction = await legacyBridge.initializeAndFundReward({
+      rewardIndex: params.rewardIndex,
+      rewardDuration: params.rewardDuration,
+      pool: addressString(params.pool),
+      creator: signerAddress(params.creator),
+      payer: signerAddress(params.payer),
+      rewardMint: addressString(params.rewardMint),
+      carryForward: params.carryForward,
+      amount: params.amount,
+      rewardMintProgram: addressString(params.rewardMintProgram),
+    });
+
+    return adaptLegacyTransaction(
+      transaction,
+      planSigners(params.creator, params.payer),
+    );
+  }
+
+  async updateRewardDuration(
+    params: UpdateRewardDurationParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(
+      this.legacyBridge,
+      "updateRewardDuration",
+    );
+
+    const transaction = await legacyBridge.updateRewardDuration({
+      pool: addressString(params.pool),
+      signer: signerAddress(params.signer),
+      rewardIndex: params.rewardIndex,
+      newDuration: params.newDuration,
+    });
+
+    return adaptLegacyTransaction(transaction, planSigners(params.signer));
+  }
+
+  async updateRewardFunder(
+    params: UpdateRewardFunderParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "updateRewardFunder");
+
+    const transaction = await legacyBridge.updateRewardFunder({
+      pool: addressString(params.pool),
+      signer: signerAddress(params.signer),
+      rewardIndex: params.rewardIndex,
+      newFunder: addressString(params.newFunder),
+    });
+
+    return adaptLegacyTransaction(transaction, planSigners(params.signer));
+  }
+
+  async fundReward(params: FundRewardParams): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "fundReward");
+
+    const transaction = await legacyBridge.fundReward({
+      funder: signerAddress(params.funder),
+      rewardIndex: params.rewardIndex,
+      pool: addressString(params.pool),
+      carryForward: params.carryForward,
+      amount: params.amount,
+      rewardMint: addressString(params.rewardMint),
+      rewardVault: addressString(params.rewardVault),
+      rewardMintProgram: addressString(params.rewardMintProgram),
+    });
+
+    return adaptLegacyTransaction(transaction, planSigners(params.funder));
+  }
+
+  async withdrawIneligibleReward(
+    params: WithdrawIneligibleRewardParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(
+      this.legacyBridge,
+      "withdrawIneligibleReward",
+    );
+
+    const transaction = await legacyBridge.withdrawIneligibleReward({
+      rewardIndex: params.rewardIndex,
+      pool: addressString(params.pool),
+      funder: signerAddress(params.funder),
+    });
+
+    return adaptLegacyTransaction(transaction, planSigners(params.funder));
+  }
+
+  async claimReward(params: ClaimRewardParams): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "claimReward");
+
+    const transaction = await legacyBridge.claimReward({
+      user: signerAddress(params.user),
+      position: addressString(params.position),
+      poolState: params.poolState,
+      positionState: params.positionState,
+      positionNftAccount: addressString(params.positionNftAccount),
+      rewardIndex: params.rewardIndex,
+      isSkipReward: params.isSkipReward,
+      feePayer: optionalSignerAddress(params.feePayer),
+    });
+
+    return adaptLegacyTransaction(
+      transaction,
+      planSigners(params.user, params.feePayer),
     );
   }
 
