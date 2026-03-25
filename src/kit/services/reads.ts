@@ -49,6 +49,17 @@ const TOKEN_2022_PROGRAM_ADDRESS = address(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
 );
 
+function adaptKitValue<T>(value: unknown): T {
+  return adaptGeneratedValue(value) as unknown as T;
+}
+
+function adaptKitRecord<T>(publicKey: Address, account: unknown): KitAccountRecord<T> {
+  return adaptGeneratedAccountRecord(
+    publicKey,
+    account,
+  ) as unknown as KitAccountRecord<T>;
+}
+
 function totalPositionLiquidity(position: KitPositionState) {
   return position.vestedLiquidity
     .add(position.permanentLockedLiquidity)
@@ -88,7 +99,7 @@ export async function fetchConfigState(
   config: Address,
 ): Promise<KitConfigState> {
   const account = await fetchConfig(rpc, config);
-  return adaptGeneratedValue(account.data) as KitConfigState;
+  return adaptKitValue<KitConfigState>(account.data);
 }
 
 export async function fetchPoolState(
@@ -96,7 +107,7 @@ export async function fetchPoolState(
   pool: Address,
 ): Promise<KitPoolState> {
   const account = await fetchPool(rpc, pool);
-  return adaptGeneratedValue(account.data) as KitPoolState;
+  return adaptKitValue<KitPoolState>(account.data);
 }
 
 export async function fetchPoolStatesByTokenAMint(
@@ -110,7 +121,7 @@ export async function fetchPoolStatesByTokenAMint(
 
   return accounts.map(({ publicKey, encodedAccount }) => {
     const decodedAccount = decodePool(encodedAccount);
-    return adaptGeneratedAccountRecord(publicKey, decodedAccount.data) as KitAccountRecord<KitPoolState>;
+    return adaptKitRecord<KitPoolState>(publicKey, decodedAccount.data);
   });
 }
 
@@ -127,7 +138,7 @@ export async function fetchPositionState(
   position: Address,
 ): Promise<KitPositionState> {
   const account = await fetchPosition(rpc, position);
-  return adaptGeneratedValue(account.data) as KitPositionState;
+  return adaptKitValue<KitPositionState>(account.data);
 }
 
 export async function getMultipleConfigs(
@@ -135,7 +146,7 @@ export async function getMultipleConfigs(
   configs: readonly Address[],
 ): Promise<KitConfigState[]> {
   const accounts = await fetchAllConfig(rpc, [...configs]);
-  return accounts.map((account) => adaptGeneratedValue(account.data) as KitConfigState);
+  return accounts.map((account) => adaptKitValue<KitConfigState>(account.data));
 }
 
 export async function getMultiplePools(
@@ -143,7 +154,7 @@ export async function getMultiplePools(
   pools: readonly Address[],
 ): Promise<KitPoolState[]> {
   const accounts = await fetchAllPool(rpc, [...pools]);
-  return accounts.map((account) => adaptGeneratedValue(account.data) as KitPoolState);
+  return accounts.map((account) => adaptKitValue<KitPoolState>(account.data));
 }
 
 export async function getMultiplePositions(
@@ -151,7 +162,9 @@ export async function getMultiplePositions(
   positions: readonly Address[],
 ): Promise<KitPositionState[]> {
   const accounts = await fetchAllPosition(rpc, [...positions]);
-  return accounts.map((account) => adaptGeneratedValue(account.data) as KitPositionState);
+  return accounts.map((account) =>
+    adaptKitValue<KitPositionState>(account.data),
+  );
 }
 
 export async function getAllConfigs(
@@ -163,7 +176,7 @@ export async function getAllConfigs(
 
   return accounts.map(({ publicKey, encodedAccount }) => {
     const decodedAccount = decodeConfig(encodedAccount);
-    return adaptGeneratedAccountRecord(publicKey, decodedAccount.data) as KitAccountRecord<KitConfigState>;
+    return adaptKitRecord<KitConfigState>(publicKey, decodedAccount.data);
   });
 }
 
@@ -188,7 +201,7 @@ export async function getAllPools(
 
   return accounts.map(({ publicKey, encodedAccount }) => {
     const decodedAccount = decodePool(encodedAccount);
-    return adaptGeneratedAccountRecord(publicKey, decodedAccount.data) as KitAccountRecord<KitPoolState>;
+    return adaptKitRecord<KitPoolState>(publicKey, decodedAccount.data);
   });
 }
 
@@ -201,7 +214,7 @@ export async function getAllPositions(
 
   return accounts.map(({ publicKey, encodedAccount }) => {
     const decodedAccount = decodePosition(encodedAccount);
-    return adaptGeneratedAccountRecord(publicKey, decodedAccount.data) as KitAccountRecord<KitPositionState>;
+    return adaptKitRecord<KitPositionState>(publicKey, decodedAccount.data);
   });
 }
 
@@ -216,7 +229,7 @@ export async function getAllPositionsByPool(
 
   return accounts.map(({ publicKey, encodedAccount }) => {
     const decodedAccount = decodePosition(encodedAccount);
-    return adaptGeneratedAccountRecord(publicKey, decodedAccount.data) as KitAccountRecord<KitPositionState>;
+    return adaptKitRecord<KitPositionState>(publicKey, decodedAccount.data);
   });
 }
 
@@ -234,8 +247,10 @@ export async function getAllVestingsByPosition(
 
     return {
       account: publicKey,
-      vestingState: adaptGeneratedValue(decodedAccount.data),
-    } as KitVestingSnapshot;
+      vestingState: adaptKitValue<KitVestingSnapshot["vestingState"]>(
+        decodedAccount.data,
+      ),
+    };
   });
 }
 
@@ -287,7 +302,7 @@ export async function getPositionsByUser(
       return {
         positionNftAccount: positionNftAccount.positionNftAccount,
         position: positionAddresses[index],
-        positionState: adaptGeneratedValue(maybePosition.data) as KitPositionState,
+        positionState: adaptKitValue<KitPositionState>(maybePosition.data),
       };
     })
     .filter((value): value is KitUserPositionRecord => value !== null);
@@ -314,6 +329,10 @@ export async function isPoolExist(
   rpc: Rpc<any>,
   pool: Address,
 ): Promise<boolean> {
-  const maybePool = await fetchMaybePool(rpc, pool);
-  return maybePool.exists;
+  try {
+    const maybePool = await fetchMaybePool(rpc, pool);
+    return maybePool.exists;
+  } catch {
+    return false;
+  }
 }

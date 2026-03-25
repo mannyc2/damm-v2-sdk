@@ -35,7 +35,7 @@ export function getQuote(params: KitGetQuoteParams): KitQuote {
   return legacyMathClient.getQuote({
     ...params,
     inputTokenMint: toPublicKey(params.inputTokenMint),
-    poolState: toLegacyState(params.poolState),
+    poolState: toLegacyState(params.poolState) as any,
   });
 }
 
@@ -43,7 +43,7 @@ export function getQuote2(params: KitGetQuote2Params): KitQuote2Result {
   return legacyMathClient.getQuote2({
     ...params,
     inputTokenMint: toPublicKey(params.inputTokenMint),
-    poolState: toLegacyState(params.poolState),
+    poolState: toLegacyState(params.poolState) as any,
   });
 }
 
@@ -64,11 +64,11 @@ export function getLiquidityDelta(params: KitLiquidityDeltaParams) {
 }
 
 export function isLockedPosition(position: KitPositionState): boolean {
-  return legacyMathClient.isLockedPosition(toLegacyState(position));
+  return legacyMathClient.isLockedPosition(toLegacyState(position) as any);
 }
 
 export function isPermanentLockedPosition(position: KitPositionState): boolean {
-  return legacyMathClient.isPermanentLockedPosition(toLegacyState(position));
+  return legacyMathClient.isPermanentLockedPosition(toLegacyState(position) as any);
 }
 
 export function canUnlockPosition(
@@ -77,8 +77,8 @@ export function canUnlockPosition(
   currentPoint: BN,
 ): { canUnlock: boolean; reason?: string } {
   return legacyMathClient.canUnlockPosition(
-    toLegacyState(positionState),
-    toLegacyVestings(vestings),
+    toLegacyState(positionState) as any,
+    toLegacyVestings(vestings) as any,
     currentPoint,
   );
 }

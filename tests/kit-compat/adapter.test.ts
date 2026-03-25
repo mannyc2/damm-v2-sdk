@@ -102,6 +102,20 @@ function addressFromPublicKey(publicKey: PublicKey): Address {
   return address(publicKey.toBase58());
 }
 
+async function fetchKitPoolState(
+  client: CpAmmKitClient,
+  pool: PublicKey,
+) {
+  return await client.fetchPoolState(addressFromPublicKey(pool));
+}
+
+async function fetchKitPositionState(
+  client: CpAmmKitClient,
+  position: PublicKey,
+) {
+  return await client.fetchPositionState(addressFromPublicKey(position));
+}
+
 async function airdrop(connection: Connection, recipient: PublicKey) {
   const signature = await connection.requestAirdrop(recipient, AIRDROP_AMOUNT);
   await waitForSignature(connection, signature);
@@ -332,6 +346,43 @@ function expectPlanParity(
   expect(plan.signers.map((signer) => signer.address)).toEqual(
     expectedSignerAddresses,
   );
+}
+
+function normalizeComparable(value: unknown): unknown {
+  if (BN.isBN(value)) {
+    return value.toString();
+  }
+
+  if (value instanceof PublicKey) {
+    return value.toBase58();
+  }
+
+  if (value instanceof Uint8Array) {
+    return Array.from(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeComparable(item));
+  }
+
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    value.constructor?.name === "Decimal"
+  ) {
+    return value.toString();
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [
+        key,
+        normalizeComparable(entryValue),
+      ]),
+    );
+  }
+
+  return value;
 }
 
 function createBaseFee() {
@@ -829,6 +880,7 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
       amountIn: new BN(100 * 10 ** DECIMALS),
       minimumAmountOut: new BN(0),
     });
+    const refreshedKitPoolState = await fetchKitPoolState(kitClient, poolAddress);
     const kitSwap2Plan = await kitClient.swap2({
       payer: actors.userSigner,
       pool: address(poolAddress.toBase58()),
@@ -845,7 +897,7 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
         getTokenProgram(refreshedPoolState.tokenBFlag),
       ),
       referralTokenAccount: null,
-      poolState: refreshedPoolState,
+      poolState: refreshedKitPoolState,
       swapMode: SwapMode.ExactIn,
       amountIn: new BN(100 * 10 ** DECIMALS),
       minimumAmountOut: new BN(0),
@@ -1262,6 +1314,14 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
     const closePositionState = await fixture.legacyClient.fetchPositionState(
       closePositionCandidate.position,
     );
+    const closeKitPoolState = await fetchKitPoolState(
+      fixture.kitClient,
+      fixture.poolAddress,
+    );
+    const closeKitPositionState = await fetchKitPositionState(
+      fixture.kitClient,
+      closePositionCandidate.position,
+    );
     const legacyRemoveAndCloseTx =
       await fixture.legacyClient.removeAllLiquidityAndClosePosition({
         owner: fixture.actors.payer.publicKey,
@@ -1281,8 +1341,8 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
         positionNftAccount: addressFromPublicKey(
           closePositionCandidate.positionNftAccount,
         ),
-        poolState: closePoolState,
-        positionState: closePositionState,
+        poolState: closeKitPoolState,
+        positionState: closeKitPositionState,
         tokenAAmountThreshold: new BN(0),
         tokenBAmountThreshold: new BN(0),
         vestings: [],
@@ -1576,6 +1636,14 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
     const claimPositionState = await fixture.legacyClient.fetchPositionState(
       fixture.initialPositionAddress,
     );
+    const claimKitPoolState = await fetchKitPoolState(
+      fixture.kitClient,
+      fixture.poolAddress,
+    );
+    const claimKitPositionState = await fetchKitPositionState(
+      fixture.kitClient,
+      fixture.initialPositionAddress,
+    );
 
     const legacyClaimRewardTx = await fixture.legacyClient.claimReward({
       user: fixture.actors.payer.publicKey,
@@ -1589,8 +1657,8 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
     const kitClaimRewardPlan = await fixture.kitClient.claimReward({
       user: fixture.actors.payerSigner,
       position: addressFromPublicKey(fixture.initialPositionAddress),
-      poolState: claimPoolState,
-      positionState: claimPositionState,
+      poolState: claimKitPoolState,
+      positionState: claimKitPositionState,
       positionNftAccount: addressFromPublicKey(initialPositionNftAccount),
       rewardIndex: 0,
       isSkipReward: true,
@@ -1608,6 +1676,14 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
     const refreshedPositionState = await fixture.legacyClient.fetchPositionState(
       fixture.initialPositionAddress,
     );
+    const refreshedKitPoolState = await fetchKitPoolState(
+      fixture.kitClient,
+      fixture.poolAddress,
+    );
+    const refreshedKitPositionState = await fetchKitPositionState(
+      fixture.kitClient,
+      fixture.initialPositionAddress,
+    );
     const legacyClaimRewardWithFeePayerTx =
       await fixture.legacyClient.claimReward({
         user: fixture.actors.payer.publicKey,
@@ -1623,8 +1699,8 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
       await fixture.kitClient.claimReward({
         user: fixture.actors.payerSigner,
         position: addressFromPublicKey(fixture.initialPositionAddress),
-        poolState: refreshedPoolState,
-        positionState: refreshedPositionState,
+        poolState: refreshedKitPoolState,
+        positionState: refreshedKitPositionState,
         positionNftAccount: addressFromPublicKey(initialPositionNftAccount),
         rewardIndex: 0,
         isSkipReward: true,
@@ -1658,5 +1734,402 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
         positionNft,
       }),
     ).rejects.toThrow("createPosition requires a legacy bridge");
+  });
+
+  it("matches legacy read and discovery surfaces with native kit reads", async () => {
+    const fixture = await createCustomPoolFixture(validator, rpcBundle);
+
+    await createStaticConfig(
+      validator.connection,
+      fixture.legacyClient,
+      fixture.actors.payer,
+    );
+
+    const userPositionA = await createPositionWithLiquidity(
+      validator,
+      fixture,
+      fixture.actors.user,
+      fixture.actors.userSigner,
+      new BN(250 * 10 ** DECIMALS),
+    );
+    const userPositionB = await createPositionWithLiquidity(
+      validator,
+      fixture,
+      fixture.actors.user,
+      fixture.actors.userSigner,
+      new BN(125 * 10 ** DECIMALS),
+    );
+
+    const legacyPoolState = await fixture.legacyClient.fetchPoolState(
+      fixture.poolAddress,
+    );
+    const kitPoolState = await fetchKitPoolState(
+      fixture.kitClient,
+      fixture.poolAddress,
+    );
+    expect(normalizeComparable(kitPoolState)).toEqual(
+      normalizeComparable(legacyPoolState),
+    );
+
+    const legacyPoolFees = await fixture.legacyClient.fetchPoolFees(
+      fixture.poolAddress,
+    );
+    const kitPoolFees = await fixture.kitClient.fetchPoolFees(
+      addressFromPublicKey(fixture.poolAddress),
+    );
+    expect(normalizeComparable(kitPoolFees)).toEqual(
+      normalizeComparable(legacyPoolFees),
+    );
+
+    const legacyPoolsByTokenA =
+      await fixture.legacyClient.fetchPoolStatesByTokenAMint(fixture.tokenAMint);
+    const kitPoolsByTokenA = await fixture.kitClient.fetchPoolStatesByTokenAMint(
+      addressFromPublicKey(fixture.tokenAMint),
+    );
+    expect(normalizeComparable(kitPoolsByTokenA)).toEqual(
+      normalizeComparable(legacyPoolsByTokenA),
+    );
+
+    const legacyConfigs = await fixture.legacyClient.getAllConfigs();
+    const kitConfigs = await fixture.kitClient.getAllConfigs();
+    expect(normalizeComparable(kitConfigs)).toEqual(
+      normalizeComparable(legacyConfigs),
+    );
+
+    const legacyStaticConfigs = await fixture.legacyClient.getStaticConfigs();
+    const kitStaticConfigs = await fixture.kitClient.getStaticConfigs();
+    expect(normalizeComparable(kitStaticConfigs)).toEqual(
+      normalizeComparable(legacyStaticConfigs),
+    );
+
+    const legacyPools = await fixture.legacyClient.getAllPools();
+    const kitPools = await fixture.kitClient.getAllPools();
+    expect(normalizeComparable(kitPools)).toEqual(
+      normalizeComparable(legacyPools),
+    );
+
+    const legacyMultiplePools = await fixture.legacyClient.getMultiplePools([
+      fixture.poolAddress,
+    ]);
+    const kitMultiplePools = await fixture.kitClient.getMultiplePools([
+      addressFromPublicKey(fixture.poolAddress),
+    ]);
+    expect(normalizeComparable(kitMultiplePools)).toEqual(
+      normalizeComparable(legacyMultiplePools),
+    );
+
+    const legacyPositionsByPool = await fixture.legacyClient.getAllPositionsByPool(
+      fixture.poolAddress,
+    );
+    const kitPositionsByPool = await fixture.kitClient.getAllPositionsByPool(
+      addressFromPublicKey(fixture.poolAddress),
+    );
+    expect(normalizeComparable(kitPositionsByPool)).toEqual(
+      normalizeComparable(legacyPositionsByPool),
+    );
+
+    const legacyMultiplePositions = await fixture.legacyClient.getMultiplePositions([
+      fixture.initialPositionAddress,
+      userPositionA.position,
+      userPositionB.position,
+    ]);
+    const kitMultiplePositions = await fixture.kitClient.getMultiplePositions([
+      addressFromPublicKey(fixture.initialPositionAddress),
+      addressFromPublicKey(userPositionA.position),
+      addressFromPublicKey(userPositionB.position),
+    ]);
+    expect(normalizeComparable(kitMultiplePositions)).toEqual(
+      normalizeComparable(legacyMultiplePositions),
+    );
+
+    const legacyUserPositions = await fixture.legacyClient.getPositionsByUser(
+      fixture.actors.user.publicKey,
+    );
+    const kitUserPositions = await fixture.kitClient.getPositionsByUser(
+      fixture.actors.userSigner.address,
+    );
+    expect(normalizeComparable(kitUserPositions)).toEqual(
+      normalizeComparable(legacyUserPositions),
+    );
+
+    const legacyUserPositionsByPool =
+      await fixture.legacyClient.getUserPositionByPool(
+        fixture.poolAddress,
+        fixture.actors.user.publicKey,
+      );
+    const kitUserPositionsByPool = await fixture.kitClient.getUserPositionByPool(
+      addressFromPublicKey(fixture.poolAddress),
+      fixture.actors.userSigner.address,
+    );
+    expect(normalizeComparable(kitUserPositionsByPool)).toEqual(
+      normalizeComparable(legacyUserPositionsByPool),
+    );
+
+    const legacyVestings = await fixture.legacyClient.getAllVestingsByPosition(
+      fixture.initialPositionAddress,
+    );
+    const kitVestings = await fixture.kitClient.getAllVestingsByPosition(
+      addressFromPublicKey(fixture.initialPositionAddress),
+    );
+    expect(normalizeComparable(kitVestings)).toEqual(
+      normalizeComparable(legacyVestings),
+    );
+
+    expect(
+      await fixture.kitClient.isPoolExist(addressFromPublicKey(fixture.poolAddress)),
+    ).toBe(true);
+    expect(
+      await fixture.kitClient.isPoolExist(
+        address("11111111111111111111111111111111"),
+      ),
+    ).toBe(false);
+  });
+
+  it("matches legacy quote and state helper outputs", async () => {
+    const fixture = await createCustomPoolFixture(validator, rpcBundle);
+    const userPosition = await createPositionWithLiquidity(
+      validator,
+      fixture,
+      fixture.actors.user,
+      fixture.actors.userSigner,
+      new BN(250 * 10 ** DECIMALS),
+    );
+
+    const legacyPoolState = await fixture.legacyClient.fetchPoolState(
+      fixture.poolAddress,
+    );
+    const kitPoolState = await fetchKitPoolState(
+      fixture.kitClient,
+      fixture.poolAddress,
+    );
+    const currentTime = Math.floor(Date.now() / 1000);
+    const currentSlot = await validator.connection.getSlot();
+    const currentPoint = new BN(currentTime);
+    const amountIn = new BN(100 * 10 ** DECIMALS);
+
+    const legacyQuote = fixture.legacyClient.getQuote({
+      inAmount: amountIn,
+      inputTokenMint: legacyPoolState.tokenAMint,
+      slippage: 100,
+      poolState: legacyPoolState,
+      currentTime,
+      currentSlot,
+      tokenADecimal: DECIMALS,
+      tokenBDecimal: DECIMALS,
+      hasReferral: false,
+    });
+    const kitQuote = fixture.kitClient.getQuote({
+      inAmount: amountIn,
+      inputTokenMint: addressFromPublicKey(legacyPoolState.tokenAMint),
+      slippage: 100,
+      poolState: kitPoolState,
+      currentTime,
+      currentSlot,
+      tokenADecimal: DECIMALS,
+      tokenBDecimal: DECIMALS,
+      hasReferral: false,
+    });
+    expect(normalizeComparable(kitQuote)).toEqual(normalizeComparable(legacyQuote));
+
+    const legacyQuote2 = fixture.legacyClient.getQuote2({
+      inputTokenMint: legacyPoolState.tokenAMint,
+      slippage: 100,
+      currentPoint,
+      poolState: legacyPoolState,
+      tokenADecimal: DECIMALS,
+      tokenBDecimal: DECIMALS,
+      hasReferral: false,
+      swapMode: SwapMode.ExactIn,
+      amountIn,
+    });
+    const kitQuote2 = fixture.kitClient.getQuote2({
+      inputTokenMint: addressFromPublicKey(legacyPoolState.tokenAMint),
+      slippage: 100,
+      currentPoint,
+      poolState: kitPoolState,
+      tokenADecimal: DECIMALS,
+      tokenBDecimal: DECIMALS,
+      hasReferral: false,
+      swapMode: SwapMode.ExactIn,
+      amountIn,
+    });
+    expect(normalizeComparable(kitQuote2)).toEqual(
+      normalizeComparable(legacyQuote2),
+    );
+
+    const legacyLiquidityDelta = fixture.legacyClient.getLiquidityDelta({
+      maxAmountTokenA: amountIn,
+      maxAmountTokenB: amountIn,
+      sqrtPrice: legacyPoolState.sqrtPrice,
+      sqrtMinPrice: legacyPoolState.sqrtMinPrice,
+      sqrtMaxPrice: legacyPoolState.sqrtMaxPrice,
+      collectFeeMode: legacyPoolState.collectFeeMode,
+      tokenAAmount: legacyPoolState.tokenAAmount,
+      tokenBAmount: legacyPoolState.tokenBAmount,
+      liquidity: legacyPoolState.liquidity,
+    });
+    const kitLiquidityDelta = fixture.kitClient.getLiquidityDelta({
+      maxAmountTokenA: amountIn,
+      maxAmountTokenB: amountIn,
+      sqrtPrice: kitPoolState.sqrtPrice,
+      sqrtMinPrice: kitPoolState.sqrtMinPrice,
+      sqrtMaxPrice: kitPoolState.sqrtMaxPrice,
+      collectFeeMode: kitPoolState.collectFeeMode,
+      tokenAAmount: kitPoolState.tokenAAmount,
+      tokenBAmount: kitPoolState.tokenBAmount,
+      liquidity: kitPoolState.liquidity,
+    });
+    expect(kitLiquidityDelta.toString()).toBe(legacyLiquidityDelta.toString());
+
+    const legacyDepositQuote = fixture.legacyClient.getDepositQuote({
+      inAmount: amountIn,
+      isTokenA: true,
+      minSqrtPrice: legacyPoolState.sqrtMinPrice,
+      maxSqrtPrice: legacyPoolState.sqrtMaxPrice,
+      sqrtPrice: legacyPoolState.sqrtPrice,
+      collectFeeMode: legacyPoolState.collectFeeMode,
+      tokenAAmount: legacyPoolState.tokenAAmount,
+      tokenBAmount: legacyPoolState.tokenBAmount,
+      liquidity: legacyPoolState.liquidity,
+    });
+    const kitDepositQuote = fixture.kitClient.getDepositQuote({
+      inAmount: amountIn,
+      isTokenA: true,
+      minSqrtPrice: kitPoolState.sqrtMinPrice,
+      maxSqrtPrice: kitPoolState.sqrtMaxPrice,
+      sqrtPrice: kitPoolState.sqrtPrice,
+      collectFeeMode: kitPoolState.collectFeeMode,
+      tokenAAmount: kitPoolState.tokenAAmount,
+      tokenBAmount: kitPoolState.tokenBAmount,
+      liquidity: kitPoolState.liquidity,
+    });
+    expect(normalizeComparable(kitDepositQuote)).toEqual(
+      normalizeComparable(legacyDepositQuote),
+    );
+
+    const legacyWithdrawQuote = fixture.legacyClient.getWithdrawQuote({
+      liquidityDelta: userPosition.depositQuote.liquidityDelta,
+      minSqrtPrice: legacyPoolState.sqrtMinPrice,
+      maxSqrtPrice: legacyPoolState.sqrtMaxPrice,
+      sqrtPrice: legacyPoolState.sqrtPrice,
+      collectFeeMode: legacyPoolState.collectFeeMode,
+      tokenAAmount: legacyPoolState.tokenAAmount,
+      tokenBAmount: legacyPoolState.tokenBAmount,
+      liquidity: legacyPoolState.liquidity,
+    });
+    const kitWithdrawQuote = fixture.kitClient.getWithdrawQuote({
+      liquidityDelta: userPosition.depositQuote.liquidityDelta,
+      minSqrtPrice: kitPoolState.sqrtMinPrice,
+      maxSqrtPrice: kitPoolState.sqrtMaxPrice,
+      sqrtPrice: kitPoolState.sqrtPrice,
+      collectFeeMode: kitPoolState.collectFeeMode,
+      tokenAAmount: kitPoolState.tokenAAmount,
+      tokenBAmount: kitPoolState.tokenBAmount,
+      liquidity: kitPoolState.liquidity,
+    });
+    expect(normalizeComparable(kitWithdrawQuote)).toEqual(
+      normalizeComparable(legacyWithdrawQuote),
+    );
+
+    const unlockedLegacyPositionState = await fixture.legacyClient.fetchPositionState(
+      userPosition.position,
+    );
+    const unlockedKitPositionState = await fetchKitPositionState(
+      fixture.kitClient,
+      userPosition.position,
+    );
+    expect(fixture.kitClient.isLockedPosition(unlockedKitPositionState)).toBe(
+      fixture.legacyClient.isLockedPosition(unlockedLegacyPositionState),
+    );
+
+    const vestingAccount = Keypair.generate();
+    const legacyLockTx = await fixture.legacyClient.lockPosition({
+      owner: fixture.actors.user.publicKey,
+      payer: fixture.actors.user.publicKey,
+      position: userPosition.position,
+      positionNftAccount: userPosition.positionNftAccount,
+      pool: fixture.poolAddress,
+      cliffPoint: new BN(currentTime + 600),
+      periodFrequency: new BN(60),
+      cliffUnlockLiquidity: new BN(0),
+      liquidityPerPeriod: new BN(1),
+      numberOfPeriod: 10,
+      innerPosition: false,
+      vestingAccount: vestingAccount.publicKey,
+    });
+    await executeLegacyBuilder(
+      validator.connection,
+      legacyLockTx,
+      [fixture.actors.user, vestingAccount],
+      fixture.actors.user,
+    );
+
+    const lockedLegacyPositionState = await fixture.legacyClient.fetchPositionState(
+      userPosition.position,
+    );
+    const lockedKitPositionState = await fetchKitPositionState(
+      fixture.kitClient,
+      userPosition.position,
+    );
+    const lockedLegacyVestings = await fixture.legacyClient.getAllVestingsByPosition(
+      userPosition.position,
+    );
+    const lockedKitVestings = await fixture.kitClient.getAllVestingsByPosition(
+      addressFromPublicKey(userPosition.position),
+    );
+    const lockCurrentPoint = new BN(currentTime + 60);
+
+    expect(fixture.kitClient.isLockedPosition(lockedKitPositionState)).toBe(
+      fixture.legacyClient.isLockedPosition(lockedLegacyPositionState),
+    );
+    expect(
+      normalizeComparable(
+        fixture.kitClient.canUnlockPosition(
+          lockedKitPositionState,
+          lockedKitVestings,
+          lockCurrentPoint,
+        ),
+      ),
+    ).toEqual(
+      normalizeComparable(
+        fixture.legacyClient.canUnlockPosition(
+          lockedLegacyPositionState,
+          lockedLegacyVestings.map(({ publicKey, account }) => ({
+            account: publicKey,
+            vestingState: account,
+          })),
+          lockCurrentPoint,
+        ),
+      ),
+    );
+
+    const initialPositionNftAccount = derivePositionNftAccount(
+      fixture.initialPositionNft.publicKey,
+    );
+    const permanentLockTx = await fixture.legacyClient.permanentLockPosition({
+      owner: fixture.actors.payer.publicKey,
+      position: fixture.initialPositionAddress,
+      positionNftAccount: initialPositionNftAccount,
+      pool: fixture.poolAddress,
+      unlockedLiquidity: new BN(1),
+    });
+    await executeLegacyBuilder(
+      validator.connection,
+      permanentLockTx,
+      [fixture.actors.payer],
+      fixture.actors.payer,
+    );
+
+    const permanentLegacyPositionState =
+      await fixture.legacyClient.fetchPositionState(fixture.initialPositionAddress);
+    const permanentKitPositionState = await fetchKitPositionState(
+      fixture.kitClient,
+      fixture.initialPositionAddress,
+    );
+    expect(
+      fixture.kitClient.isPermanentLockedPosition(permanentKitPositionState),
+    ).toBe(
+      fixture.legacyClient.isPermanentLockedPosition(permanentLegacyPositionState),
+    );
   });
 });
