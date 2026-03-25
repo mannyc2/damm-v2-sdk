@@ -6,8 +6,10 @@ import {
   type RpcSubscriptions,
   type TransactionSigner,
 } from "@solana/kit";
+import type BN from "bn.js";
 
 import { LegacyKitBridge } from "../internal/legacyKitBridge";
+import * as legacyKitMath from "../internal/legacyKitMath";
 import { adaptLegacyPoolResult, adaptLegacyTransaction } from "./adapters/legacy";
 import { getDefaultRpcSubscriptionsUrl } from "./helpers";
 import * as readServices from "./services";
@@ -38,11 +40,20 @@ import type {
   KitAccountRecord,
   KitConfigState,
   KitDecodedPoolFees,
+  KitDepositQuote,
+  KitGetDepositQuoteParams,
+  KitGetQuote2Params,
+  KitGetQuoteParams,
+  KitGetWithdrawQuoteParams,
+  KitLiquidityDeltaParams,
   KitPoolState,
   KitPositionState,
+  KitQuote,
+  KitQuote2Result,
   KitTransactionPlan,
   KitUserPositionRecord,
   KitVestingSnapshot,
+  KitWithdrawQuote,
   RemoveAllLiquidityParams,
   RemoveLiquidityParams,
   SplitPosition2Params,
@@ -242,6 +253,42 @@ export class CpAmmKitClient {
 
   async isPoolExist(pool: Address): Promise<boolean> {
     return await readServices.isPoolExist(this.rpc, pool);
+  }
+
+  getQuote(params: KitGetQuoteParams): KitQuote {
+    return legacyKitMath.getQuote(params);
+  }
+
+  getQuote2(params: KitGetQuote2Params): KitQuote2Result {
+    return legacyKitMath.getQuote2(params);
+  }
+
+  getDepositQuote(params: KitGetDepositQuoteParams): KitDepositQuote {
+    return legacyKitMath.getDepositQuote(params);
+  }
+
+  getWithdrawQuote(params: KitGetWithdrawQuoteParams): KitWithdrawQuote {
+    return legacyKitMath.getWithdrawQuote(params);
+  }
+
+  getLiquidityDelta(params: KitLiquidityDeltaParams): BN {
+    return legacyKitMath.getLiquidityDelta(params);
+  }
+
+  isLockedPosition(position: KitPositionState): boolean {
+    return legacyKitMath.isLockedPosition(position);
+  }
+
+  isPermanentLockedPosition(position: KitPositionState): boolean {
+    return legacyKitMath.isPermanentLockedPosition(position);
+  }
+
+  canUnlockPosition(
+    positionState: KitPositionState,
+    vestings: readonly KitVestingSnapshot[],
+    currentPoint: BN,
+  ): { canUnlock: boolean; reason?: string } {
+    return legacyKitMath.canUnlockPosition(positionState, vestings, currentPoint);
   }
 
   async createCustomPool(

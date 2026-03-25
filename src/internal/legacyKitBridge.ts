@@ -3,6 +3,7 @@ import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import BN from "bn.js";
 
 import { CpAmm } from "../CpAmm";
+import { toLegacyState } from "./legacyKitState";
 import { derivePoolAddress, derivePositionAddress } from "../pda";
 import type { KitInstruction } from "../kit/types";
 import type {
@@ -411,8 +412,9 @@ function toLegacyVestings(
 ): RemoveLiquidityParams["vestings"] {
   return vestings.map(({ account, vestingState }) => ({
     account: toPublicKey(account),
-    vestingState:
-      vestingState as RemoveLiquidityParams["vestings"][number]["vestingState"],
+    vestingState: toLegacyState(
+      vestingState,
+    ) as RemoveLiquidityParams["vestings"][number]["vestingState"],
   }));
 }
 
@@ -658,10 +660,12 @@ export class LegacyKitBridge {
         owner: toPublicKey(params.owner),
         position: toPublicKey(params.position),
         positionNftAccount: toPublicKey(params.positionNftAccount),
-        poolState:
-          params.poolState as RemoveAllLiquidityAndClosePositionParams["poolState"],
-        positionState:
-          params.positionState as RemoveAllLiquidityAndClosePositionParams["positionState"],
+        poolState: toLegacyState(
+          params.poolState,
+        ) as RemoveAllLiquidityAndClosePositionParams["poolState"],
+        positionState: toLegacyState(
+          params.positionState,
+        ) as RemoveAllLiquidityAndClosePositionParams["positionState"],
         tokenAAmountThreshold: params.tokenAAmountThreshold,
         tokenBAmountThreshold: params.tokenBAmountThreshold,
         vestings: toLegacyVestings(params.vestings),
@@ -772,10 +776,12 @@ export class LegacyKitBridge {
       owner: toPublicKey(params.owner),
       positionA: toPublicKey(params.positionA),
       positionB: toPublicKey(params.positionB),
-      poolState: params.poolState as MergePositionParams["poolState"],
+      poolState: toLegacyState(params.poolState) as MergePositionParams["poolState"],
       positionBNftAccount: toPublicKey(params.positionBNftAccount),
       positionANftAccount: toPublicKey(params.positionANftAccount),
-      positionBState: params.positionBState as MergePositionParams["positionBState"],
+      positionBState: toLegacyState(
+        params.positionBState,
+      ) as MergePositionParams["positionBState"],
       tokenAAmountAddLiquidityThreshold: params.tokenAAmountAddLiquidityThreshold,
       tokenBAmountAddLiquidityThreshold: params.tokenBAmountAddLiquidityThreshold,
       tokenAAmountRemoveLiquidityThreshold:
@@ -1007,8 +1013,10 @@ export class LegacyKitBridge {
     const claimRewardParams: ClaimRewardParams = {
       user: toPublicKey(params.user),
       position: toPublicKey(params.position),
-      poolState: params.poolState as ClaimRewardParams["poolState"],
-      positionState: params.positionState as ClaimRewardParams["positionState"],
+      poolState: toLegacyState(params.poolState) as ClaimRewardParams["poolState"],
+      positionState: toLegacyState(
+        params.positionState,
+      ) as ClaimRewardParams["positionState"],
       positionNftAccount: toPublicKey(params.positionNftAccount),
       rewardIndex: params.rewardIndex,
       isSkipReward: params.isSkipReward,
@@ -1036,7 +1044,9 @@ export class LegacyKitBridge {
       tokenBProgram: toPublicKey(params.tokenBProgram),
       referralTokenAccount: toPublicKeyOrNull(params.referralTokenAccount),
       receiver: params.receiver ? toPublicKey(params.receiver) : undefined,
-      poolState: params.poolState as Swap2Params["poolState"],
+      poolState: params.poolState
+        ? (toLegacyState(params.poolState) as Swap2Params["poolState"])
+        : undefined,
       swapMode: params.swapMode,
       ...("amountIn" in params
         ? {
