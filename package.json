@@ -7,6 +7,18 @@
 	"module": "./dist/index.mjs",
 	"source": "./src/index.ts",
 	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		},
+		"./kit": {
+			"types": "./dist/kit/index.d.ts",
+			"import": "./dist/kit/index.mjs",
+			"require": "./dist/kit/index.js"
+		}
+	},
 	"author": "Minh Do <minh@raccoons.dev>",
 	"repository": {
 		"type": "git",
@@ -21,7 +33,11 @@
 		"build": "tsup",
 		"clean": "rm -rf dist && rm -rf node_modules",
 		"start": "npm run build -- --watch",
+		"check:kit-imports": "tsx scripts/check-kit-imports.ts",
 		"test": "vitest run",
+		"test:kit-compat": "vitest run tests/kit-compat",
+		"test:all": "pnpm check:kit-imports && pnpm build && pnpm check-types && pnpm test && pnpm test:kit-compat",
+		"generate:kit": "tsx scripts/generate-kit-client.ts",
 		"check-types": "tsc --noEmit"
 	},
 	"devDependencies": {
@@ -36,6 +52,11 @@
 	},
 	"dependencies": {
 		"@coral-xyz/anchor": "^0.31.0",
+		"@solana-program/compute-budget": "^0.15.0",
+		"@solana-program/system": "^0.12.0",
+		"@solana-program/token": "^0.12.0",
+		"@solana/compat": "^6.5.0",
+		"@solana/kit": "^6.5.0",
 		"@solana/spl-token": "^0.4.8",
 		"@solana/web3.js": "^1.95.3",
 		"@types/bn.js": "^5.1.0",
