@@ -1,11 +1,25 @@
 import type {
   Address,
   Instruction,
+  ReadonlyUint8Array,
   Rpc,
   RpcSubscriptions,
   TransactionSigner,
 } from "@solana/kit";
 import BN from "bn.js";
+import type Decimal from "decimal.js";
+import type { Mint } from "@solana/spl-token";
+import type {
+  Config as GeneratedConfig,
+  PodAlignedFeeMarketCapScheduler as GeneratedPodAlignedFeeMarketCapScheduler,
+  PodAlignedFeeRateLimiter as GeneratedPodAlignedFeeRateLimiter,
+  PodAlignedFeeTimeScheduler as GeneratedPodAlignedFeeTimeScheduler,
+  Pool as GeneratedPool,
+  Position as GeneratedPosition,
+  SwapResult2 as GeneratedSwapResult2,
+  TokenBadge as GeneratedTokenBadge,
+  Vesting as GeneratedVesting,
+} from "./generated";
 
 export type KitInstruction = Instruction;
 
@@ -23,6 +37,14 @@ export enum CollectFeeMode {
 export enum ActivationType {
   Slot,
   Timestamp,
+}
+
+export enum BaseFeeMode {
+  FeeTimeSchedulerLinear,
+  FeeTimeSchedulerExponential,
+  RateLimiter,
+  FeeMarketCapSchedulerLinear,
+  FeeMarketCapSchedulerExponential,
 }
 
 export enum SwapMode {
@@ -44,6 +66,167 @@ export type KitPoolFeesParams = {
   dynamicFee: KitDynamicFee | null;
 };
 
+type StripDiscriminator<T> = T extends { discriminator: unknown }
+  ? Omit<T, "discriminator">
+  : T;
+
+type KitifyState<T> = T extends bigint
+  ? BN
+  : T extends ReadonlyUint8Array
+    ? ReadonlyUint8Array
+    : T extends readonly (infer U)[]
+      ? Array<KitifyState<U>>
+      : T extends object
+        ? {
+            [K in keyof T]: KitifyState<T[K]>;
+          }
+        : T;
+
+type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+export type KitAccountRecord<T> = {
+  publicKey: Address;
+  account: T;
+};
+
+export type KitConfigState = Simplify<KitifyState<StripDiscriminator<GeneratedConfig>>>;
+export type KitPoolState = Simplify<KitifyState<StripDiscriminator<GeneratedPool>>>;
+export type KitPositionState = Simplify<
+  KitifyState<StripDiscriminator<GeneratedPosition>>
+>;
+export type KitVestingState = Simplify<
+  KitifyState<StripDiscriminator<GeneratedVesting>>
+>;
+export type KitTokenBadgeState = Simplify<
+  KitifyState<StripDiscriminator<GeneratedTokenBadge>>
+>;
+
+export type KitDecodedPoolFees =
+  | Simplify<
+      KitifyState<StripDiscriminator<GeneratedPodAlignedFeeTimeScheduler>>
+    >
+  | Simplify<
+      KitifyState<StripDiscriminator<GeneratedPodAlignedFeeRateLimiter>>
+    >
+  | Simplify<
+      KitifyState<StripDiscriminator<GeneratedPodAlignedFeeMarketCapScheduler>>
+    >;
+
+export type KitTransferFeeMintInfo = {
+  mint: Mint;
+  currentEpoch: number;
+};
+
+export type KitQuote = {
+  swapInAmount: BN;
+  consumedInAmount: BN;
+  swapOutAmount: BN;
+  minSwapOutAmount: BN;
+  totalFee: BN;
+  priceImpact: Decimal;
+};
+
+type KitSwapResult2Base = Simplify<KitifyState<GeneratedSwapResult2>>;
+
+export interface KitQuote2Result extends KitSwapResult2Base {
+  priceImpact: Decimal;
+  minimumAmountOut?: BN;
+  maximumAmountIn?: BN;
+}
+
+export type KitDepositQuote = {
+  actualInputAmount: BN;
+  consumedInputAmount: BN;
+  outputAmount: BN;
+  liquidityDelta: BN;
+};
+
+export type KitWithdrawQuote = {
+  liquidityDelta: BN;
+  outAmountA: BN;
+  outAmountB: BN;
+};
+
+export type KitLiquidityDeltaParams = {
+  maxAmountTokenA: BN;
+  maxAmountTokenB: BN;
+  sqrtPrice: BN;
+  sqrtMinPrice: BN;
+  sqrtMaxPrice: BN;
+  tokenAInfo?: KitTransferFeeMintInfo;
+  tokenBInfo?: KitTransferFeeMintInfo;
+  collectFeeMode: CollectFeeMode;
+  tokenAAmount?: BN;
+  tokenBAmount?: BN;
+  liquidity?: BN;
+};
+
+export type KitGetQuoteParams = {
+  inAmount: BN;
+  inputTokenMint: Address;
+  slippage: number;
+  poolState: KitPoolState;
+  currentTime: number;
+  currentSlot: number;
+  inputTokenInfo?: KitTransferFeeMintInfo;
+  outputTokenInfo?: KitTransferFeeMintInfo;
+  tokenADecimal: number;
+  tokenBDecimal: number;
+  hasReferral?: boolean;
+};
+
+export type KitGetQuote2Params = {
+  inputTokenMint: Address;
+  slippage: number;
+  currentPoint: BN;
+  poolState: KitPoolState;
+  inputTokenInfo?: KitTransferFeeMintInfo;
+  outputTokenInfo?: KitTransferFeeMintInfo;
+  tokenADecimal: number;
+  tokenBDecimal: number;
+  hasReferral: boolean;
+} & (
+  | {
+      swapMode: SwapMode.ExactIn;
+      amountIn: BN;
+    }
+  | {
+      swapMode: SwapMode.PartialFill;
+      amountIn: BN;
+    }
+  | {
+      swapMode: SwapMode.ExactOut;
+      amountOut: BN;
+    }
+);
+
+export type KitGetDepositQuoteParams = {
+  inAmount: BN;
+  isTokenA: boolean;
+  minSqrtPrice: BN;
+  maxSqrtPrice: BN;
+  sqrtPrice: BN;
+  inputTokenInfo?: KitTransferFeeMintInfo;
+  outputTokenInfo?: KitTransferFeeMintInfo;
+  collectFeeMode: CollectFeeMode;
+  tokenAAmount: BN;
+  tokenBAmount: BN;
+  liquidity: BN;
+};
+
+export type KitGetWithdrawQuoteParams = {
+  liquidityDelta: BN;
+  minSqrtPrice: BN;
+  maxSqrtPrice: BN;
+  sqrtPrice: BN;
+  tokenATokenInfo?: KitTransferFeeMintInfo;
+  tokenBTokenInfo?: KitTransferFeeMintInfo;
+  collectFeeMode: CollectFeeMode;
+  tokenAAmount: BN;
+  tokenBAmount: BN;
+  liquidity: BN;
+};
+
 export type CpAmmKitClientOptions = {
   rpc: Rpc<any>;
   rpcSubscriptions?: RpcSubscriptions<any>;
@@ -54,9 +237,15 @@ export type FromRpcUrlOptions = {
   rpcSubscriptionsUrl?: string;
 };
 
+export type KitUserPositionRecord = {
+  positionNftAccount: Address;
+  position: Address;
+  positionState: KitPositionState;
+};
+
 export type KitVestingSnapshot = {
   account: Address;
-  vestingState: unknown;
+  vestingState: KitVestingState;
 };
 
 export type CreateCustomPoolParams = {
@@ -182,8 +371,8 @@ export type RemoveAllLiquidityAndClosePositionParams = {
   owner: TransactionSigner;
   position: Address;
   positionNftAccount: Address;
-  poolState: unknown;
-  positionState: unknown;
+  poolState: KitPoolState;
+  positionState: KitPositionState;
   tokenAAmountThreshold: BN;
   tokenBAmountThreshold: BN;
   vestings: readonly KitVestingSnapshot[];
@@ -242,10 +431,10 @@ export type MergePositionParams = {
   owner: TransactionSigner;
   positionA: Address;
   positionB: Address;
-  poolState: unknown;
+  poolState: KitPoolState;
   positionBNftAccount: Address;
   positionANftAccount: Address;
-  positionBState: unknown;
+  positionBState: KitPositionState;
   tokenAAmountAddLiquidityThreshold: BN;
   tokenBAmountAddLiquidityThreshold: BN;
   tokenAAmountRemoveLiquidityThreshold: BN;
@@ -362,8 +551,8 @@ export type WithdrawIneligibleRewardParams = {
 export type ClaimRewardParams = {
   user: TransactionSigner;
   position: Address;
-  poolState: unknown;
-  positionState: unknown;
+  poolState: KitPoolState;
+  positionState: KitPositionState;
   positionNftAccount: Address;
   rewardIndex: number;
   isSkipReward: boolean;
@@ -383,7 +572,7 @@ export type Swap2Params = {
   tokenBProgram: Address;
   referralTokenAccount: Address | null;
   receiver?: Address;
-  poolState?: unknown;
+  poolState?: KitPoolState;
 } & (
   | {
       swapMode: SwapMode.ExactIn;

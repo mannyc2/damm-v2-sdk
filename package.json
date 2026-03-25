@@ -41,7 +41,10 @@
 		"check-types": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@codama/nodes-from-anchor": "^1.4.0",
+		"@codama/renderers-js": "^2.1.0",
 		"@types/invariant": "^2.2.35",
+		"codama": "^1.5.1",
 		"prettier": "^3.7.4",
 		"solana-bankrun": "^0.4.0",
 		"ts-node": "^10.9.2",

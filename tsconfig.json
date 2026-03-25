@@ -3,10 +3,11 @@
     "strict": true,
     "strictNullChecks": false,
     "target": "es6",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "lib": [
       "es2015"
     ],
-    "module": "commonjs",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
