@@ -3,12 +3,17 @@ import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import BN from "bn.js";
 
 import { CpAmm } from "../CpAmm";
+import { derivePoolAddress, derivePositionAddress } from "../pda";
 import type { KitInstruction } from "../kit/types";
 import type {
   AddLiquidityParams,
+  CreatePoolParams,
+  CreatePositionAndAddLiquidity,
   CreatePositionParams,
   InitializeCustomizeablePoolParams,
   InitializeCustomizeablePoolWithDynamicConfigParams,
+  RemoveAllLiquidityParams,
+  RemoveLiquidityParams,
   Swap2Params,
 } from "../types";
 
@@ -65,6 +70,23 @@ type LegacyCreatePositionParams = {
   positionNft: AddressLike;
 };
 
+type LegacyCreatePoolParams = {
+  creator: AddressLike;
+  payer: AddressLike;
+  config: AddressLike;
+  positionNft: AddressLike;
+  tokenAMint: AddressLike;
+  tokenBMint: AddressLike;
+  initSqrtPrice: BN;
+  liquidityDelta: BN;
+  tokenAAmount: BN;
+  tokenBAmount: BN;
+  activationPoint: BN | null;
+  tokenAProgram: AddressLike;
+  tokenBProgram: AddressLike;
+  isLockLiquidity?: boolean;
+};
+
 type LegacyAddLiquidityParams = {
   owner: AddressLike;
   position: AddressLike;
@@ -82,6 +104,49 @@ type LegacyAddLiquidityParams = {
   tokenAProgram: AddressLike;
   tokenBProgram: AddressLike;
 };
+
+type LegacyCreatePositionAndAddLiquidityParams = {
+  owner: AddressLike;
+  pool: AddressLike;
+  positionNft: AddressLike;
+  liquidityDelta: BN;
+  maxAmountTokenA: BN;
+  maxAmountTokenB: BN;
+  tokenAAmountThreshold: BN;
+  tokenBAmountThreshold: BN;
+  tokenAMint: AddressLike;
+  tokenBMint: AddressLike;
+  tokenAProgram: AddressLike;
+  tokenBProgram: AddressLike;
+};
+
+type LegacyKitVestingSnapshot = {
+  account: AddressLike;
+  vestingState: unknown;
+};
+
+type LegacyRemoveLiquidityParams = {
+  owner: AddressLike;
+  position: AddressLike;
+  pool: AddressLike;
+  positionNftAccount: AddressLike;
+  liquidityDelta: BN;
+  tokenAAmountThreshold: BN;
+  tokenBAmountThreshold: BN;
+  tokenAMint: AddressLike;
+  tokenBMint: AddressLike;
+  tokenAVault: AddressLike;
+  tokenBVault: AddressLike;
+  tokenAProgram: AddressLike;
+  tokenBProgram: AddressLike;
+  vestings: readonly LegacyKitVestingSnapshot[];
+  currentPoint: BN;
+};
+
+type LegacyRemoveAllLiquidityParams = Omit<
+  LegacyRemoveLiquidityParams,
+  "liquidityDelta"
+>;
 
 type LegacySwap2Params = {
   payer: AddressLike;
@@ -120,6 +185,16 @@ function toPublicKeyOrNull(address: AddressLike | null): PublicKey | null {
 
 function toKitInstructions(transaction: Transaction): readonly KitInstruction[] {
   return transaction.instructions.map(fromLegacyTransactionInstruction);
+}
+
+function toLegacyVestings(
+  vestings: readonly LegacyKitVestingSnapshot[],
+): RemoveLiquidityParams["vestings"] {
+  return vestings.map(({ account, vestingState }) => ({
+    account: toPublicKey(account),
+    vestingState:
+      vestingState as RemoveLiquidityParams["vestings"][number]["vestingState"],
+  }));
 }
 
 export class LegacyKitBridge {
@@ -213,6 +288,35 @@ export class LegacyKitBridge {
     };
   }
 
+  async createPool(params: LegacyCreatePoolParams): Promise<LegacyKitPoolResultSeed> {
+    const createPoolParams: CreatePoolParams = {
+      creator: toPublicKey(params.creator),
+      payer: toPublicKey(params.payer),
+      config: toPublicKey(params.config),
+      positionNft: toPublicKey(params.positionNft),
+      tokenAMint: toPublicKey(params.tokenAMint),
+      tokenBMint: toPublicKey(params.tokenBMint),
+      initSqrtPrice: params.initSqrtPrice,
+      liquidityDelta: params.liquidityDelta,
+      tokenAAmount: params.tokenAAmount,
+      tokenBAmount: params.tokenBAmount,
+      activationPoint: params.activationPoint,
+      tokenAProgram: toPublicKey(params.tokenAProgram),
+      tokenBProgram: toPublicKey(params.tokenBProgram),
+      isLockLiquidity: params.isLockLiquidity,
+    };
+
+    return {
+      instructions: toKitInstructions(await this.client.createPool(createPoolParams)),
+      pool: derivePoolAddress(
+        createPoolParams.config,
+        createPoolParams.tokenAMint,
+        createPoolParams.tokenBMint,
+      ).toBase58(),
+      position: derivePositionAddress(createPoolParams.positionNft).toBase58(),
+    };
+  }
+
   async addLiquidity(params: LegacyAddLiquidityParams): Promise<LegacyKitPlanSeed> {
     const addLiquidityParams: AddLiquidityParams = {
       owner: toPublicKey(params.owner),
@@ -235,6 +339,88 @@ export class LegacyKitBridge {
     return {
       instructions: toKitInstructions(
         await this.client.addLiquidity(addLiquidityParams),
+      ),
+    };
+  }
+
+  async createPositionAndAddLiquidity(
+    params: LegacyCreatePositionAndAddLiquidityParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const createPositionAndAddLiquidityParams: CreatePositionAndAddLiquidity = {
+      owner: toPublicKey(params.owner),
+      pool: toPublicKey(params.pool),
+      positionNft: toPublicKey(params.positionNft),
+      liquidityDelta: params.liquidityDelta,
+      maxAmountTokenA: params.maxAmountTokenA,
+      maxAmountTokenB: params.maxAmountTokenB,
+      tokenAAmountThreshold: params.tokenAAmountThreshold,
+      tokenBAmountThreshold: params.tokenBAmountThreshold,
+      tokenAMint: toPublicKey(params.tokenAMint),
+      tokenBMint: toPublicKey(params.tokenBMint),
+      tokenAProgram: toPublicKey(params.tokenAProgram),
+      tokenBProgram: toPublicKey(params.tokenBProgram),
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.createPositionAndAddLiquidity(
+          createPositionAndAddLiquidityParams,
+        ),
+      ),
+    };
+  }
+
+  async removeLiquidity(
+    params: LegacyRemoveLiquidityParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const removeLiquidityParams: RemoveLiquidityParams = {
+      owner: toPublicKey(params.owner),
+      position: toPublicKey(params.position),
+      pool: toPublicKey(params.pool),
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+      liquidityDelta: params.liquidityDelta,
+      tokenAAmountThreshold: params.tokenAAmountThreshold,
+      tokenBAmountThreshold: params.tokenBAmountThreshold,
+      tokenAMint: toPublicKey(params.tokenAMint),
+      tokenBMint: toPublicKey(params.tokenBMint),
+      tokenAVault: toPublicKey(params.tokenAVault),
+      tokenBVault: toPublicKey(params.tokenBVault),
+      tokenAProgram: toPublicKey(params.tokenAProgram),
+      tokenBProgram: toPublicKey(params.tokenBProgram),
+      vestings: toLegacyVestings(params.vestings),
+      currentPoint: params.currentPoint,
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.removeLiquidity(removeLiquidityParams),
+      ),
+    };
+  }
+
+  async removeAllLiquidity(
+    params: LegacyRemoveAllLiquidityParams,
+  ): Promise<LegacyKitPlanSeed> {
+    const removeAllLiquidityParams: RemoveAllLiquidityParams = {
+      owner: toPublicKey(params.owner),
+      position: toPublicKey(params.position),
+      pool: toPublicKey(params.pool),
+      positionNftAccount: toPublicKey(params.positionNftAccount),
+      tokenAAmountThreshold: params.tokenAAmountThreshold,
+      tokenBAmountThreshold: params.tokenBAmountThreshold,
+      tokenAMint: toPublicKey(params.tokenAMint),
+      tokenBMint: toPublicKey(params.tokenBMint),
+      tokenAVault: toPublicKey(params.tokenAVault),
+      tokenBVault: toPublicKey(params.tokenBVault),
+      tokenAProgram: toPublicKey(params.tokenAProgram),
+      tokenBProgram: toPublicKey(params.tokenBProgram),
+      vestings: toLegacyVestings(params.vestings),
+      currentPoint: params.currentPoint,
+    };
+
+    return {
+      instructions: toKitInstructions(
+        await this.client.removeAllLiquidity(removeAllLiquidityParams),
       ),
     };
   }

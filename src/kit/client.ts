@@ -13,13 +13,18 @@ import { getDefaultRpcSubscriptionsUrl } from "./helpers";
 import type {
   AddLiquidityParams,
   CpAmmKitClientOptions,
+  CreatePoolParams,
+  CreatePoolResult,
   CreateCustomPoolParams,
   CreateCustomPoolResult,
   CreateCustomPoolWithDynamicConfigParams,
   CreateCustomPoolWithDynamicConfigResult,
+  CreatePositionAndAddLiquidityParams,
   CreatePositionParams,
   FromRpcUrlOptions,
   KitTransactionPlan,
+  RemoveAllLiquidityParams,
+  RemoveLiquidityParams,
   Swap2Params,
 } from "./types";
 
@@ -207,6 +212,32 @@ export class CpAmmKitClient {
     );
   }
 
+  async createPool(params: CreatePoolParams): Promise<CreatePoolResult> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "createPool");
+
+    const result = await legacyBridge.createPool({
+      creator: addressString(params.creator),
+      payer: signerAddress(params.payer),
+      config: addressString(params.config),
+      positionNft: signerAddress(params.positionNft),
+      tokenAMint: addressString(params.tokenAMint),
+      tokenBMint: addressString(params.tokenBMint),
+      initSqrtPrice: params.initSqrtPrice,
+      liquidityDelta: params.liquidityDelta,
+      tokenAAmount: params.tokenAAmount,
+      tokenBAmount: params.tokenBAmount,
+      activationPoint: params.activationPoint,
+      tokenAProgram: addressString(params.tokenAProgram),
+      tokenBProgram: addressString(params.tokenBProgram),
+      isLockLiquidity: params.isLockLiquidity,
+    });
+
+    return adaptLegacyPoolResult(
+      result,
+      planSigners(params.payer, params.positionNft),
+    );
+  }
+
   async createPosition(params: CreatePositionParams): Promise<KitTransactionPlan> {
     const legacyBridge = assertLegacyBridge(this.legacyBridge, "createPosition");
 
@@ -242,6 +273,95 @@ export class CpAmmKitClient {
       tokenBVault: addressString(params.tokenBVault),
       tokenAProgram: addressString(params.tokenAProgram),
       tokenBProgram: addressString(params.tokenBProgram),
+    });
+
+    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+  }
+
+  async createPositionAndAddLiquidity(
+    params: CreatePositionAndAddLiquidityParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(
+      this.legacyBridge,
+      "createPositionAndAddLiquidity",
+    );
+
+    const transaction = await legacyBridge.createPositionAndAddLiquidity({
+      owner: signerAddress(params.owner),
+      pool: addressString(params.pool),
+      positionNft: signerAddress(params.positionNft),
+      liquidityDelta: params.liquidityDelta,
+      maxAmountTokenA: params.maxAmountTokenA,
+      maxAmountTokenB: params.maxAmountTokenB,
+      tokenAAmountThreshold: params.tokenAAmountThreshold,
+      tokenBAmountThreshold: params.tokenBAmountThreshold,
+      tokenAMint: addressString(params.tokenAMint),
+      tokenBMint: addressString(params.tokenBMint),
+      tokenAProgram: addressString(params.tokenAProgram),
+      tokenBProgram: addressString(params.tokenBProgram),
+    });
+
+    return adaptLegacyTransaction(
+      transaction,
+      planSigners(params.owner, params.positionNft),
+    );
+  }
+
+  async removeLiquidity(
+    params: RemoveLiquidityParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(this.legacyBridge, "removeLiquidity");
+
+    const transaction = await legacyBridge.removeLiquidity({
+      owner: signerAddress(params.owner),
+      position: addressString(params.position),
+      pool: addressString(params.pool),
+      positionNftAccount: addressString(params.positionNftAccount),
+      liquidityDelta: params.liquidityDelta,
+      tokenAAmountThreshold: params.tokenAAmountThreshold,
+      tokenBAmountThreshold: params.tokenBAmountThreshold,
+      tokenAMint: addressString(params.tokenAMint),
+      tokenBMint: addressString(params.tokenBMint),
+      tokenAVault: addressString(params.tokenAVault),
+      tokenBVault: addressString(params.tokenBVault),
+      tokenAProgram: addressString(params.tokenAProgram),
+      tokenBProgram: addressString(params.tokenBProgram),
+      vestings: params.vestings.map(({ account, vestingState }) => ({
+        account: addressString(account),
+        vestingState,
+      })),
+      currentPoint: params.currentPoint,
+    });
+
+    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+  }
+
+  async removeAllLiquidity(
+    params: RemoveAllLiquidityParams,
+  ): Promise<KitTransactionPlan> {
+    const legacyBridge = assertLegacyBridge(
+      this.legacyBridge,
+      "removeAllLiquidity",
+    );
+
+    const transaction = await legacyBridge.removeAllLiquidity({
+      owner: signerAddress(params.owner),
+      position: addressString(params.position),
+      pool: addressString(params.pool),
+      positionNftAccount: addressString(params.positionNftAccount),
+      tokenAAmountThreshold: params.tokenAAmountThreshold,
+      tokenBAmountThreshold: params.tokenBAmountThreshold,
+      tokenAMint: addressString(params.tokenAMint),
+      tokenBMint: addressString(params.tokenBMint),
+      tokenAVault: addressString(params.tokenAVault),
+      tokenBVault: addressString(params.tokenBVault),
+      tokenAProgram: addressString(params.tokenAProgram),
+      tokenBProgram: addressString(params.tokenBProgram),
+      vestings: params.vestings.map(({ account, vestingState }) => ({
+        account: addressString(account),
+        vestingState,
+      })),
+      currentPoint: params.currentPoint,
     });
 
     return adaptLegacyTransaction(transaction, planSigners(params.owner));

@@ -54,6 +54,11 @@ export type FromRpcUrlOptions = {
   rpcSubscriptionsUrl?: string;
 };
 
+export type KitVestingSnapshot = {
+  account: Address;
+  vestingState: unknown;
+};
+
 export type CreateCustomPoolParams = {
   payer: TransactionSigner;
   creator: Address;
@@ -91,6 +96,25 @@ export type CreateCustomPoolWithDynamicConfigParams =
 
 export type CreateCustomPoolWithDynamicConfigResult = CreateCustomPoolResult;
 
+export type CreatePoolParams = {
+  creator: Address;
+  payer: TransactionSigner;
+  config: Address;
+  positionNft: TransactionSigner;
+  tokenAMint: Address;
+  tokenBMint: Address;
+  initSqrtPrice: BN;
+  liquidityDelta: BN;
+  tokenAAmount: BN;
+  tokenBAmount: BN;
+  activationPoint: BN | null;
+  tokenAProgram: Address;
+  tokenBProgram: Address;
+  isLockLiquidity?: boolean;
+};
+
+export type CreatePoolResult = CreateCustomPoolResult;
+
 export type CreatePositionParams = {
   owner: Address;
   payer: TransactionSigner;
@@ -115,6 +139,44 @@ export type AddLiquidityParams = {
   tokenAProgram: Address;
   tokenBProgram: Address;
 };
+
+export type CreatePositionAndAddLiquidityParams = {
+  owner: TransactionSigner;
+  pool: Address;
+  positionNft: TransactionSigner;
+  liquidityDelta: BN;
+  maxAmountTokenA: BN;
+  maxAmountTokenB: BN;
+  tokenAAmountThreshold: BN;
+  tokenBAmountThreshold: BN;
+  tokenAMint: Address;
+  tokenBMint: Address;
+  tokenAProgram: Address;
+  tokenBProgram: Address;
+};
+
+export type RemoveLiquidityParams = {
+  owner: TransactionSigner;
+  position: Address;
+  pool: Address;
+  positionNftAccount: Address;
+  liquidityDelta: BN;
+  tokenAAmountThreshold: BN;
+  tokenBAmountThreshold: BN;
+  tokenAMint: Address;
+  tokenBMint: Address;
+  tokenAVault: Address;
+  tokenBVault: Address;
+  tokenAProgram: Address;
+  tokenBProgram: Address;
+  vestings: readonly KitVestingSnapshot[];
+  currentPoint: BN;
+};
+
+export type RemoveAllLiquidityParams = Omit<
+  RemoveLiquidityParams,
+  "liquidityDelta"
+>;
 
 export type Swap2Params = {
   payer: TransactionSigner;
