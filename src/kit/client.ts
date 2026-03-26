@@ -7,7 +7,6 @@ import {
 } from "@solana/kit";
 import type BN from "bn.js";
 
-import * as legacyKitMath from "../internal/legacyKitMath";
 import {
   addLiquidityPlan,
   closePositionPlan,
@@ -37,6 +36,7 @@ import {
   withdrawIneligibleRewardPlan,
 } from "./builders";
 import { getDefaultRpcSubscriptionsUrl } from "./helpers";
+import * as kitMath from "./math";
 import * as readServices from "./services";
 import type {
   AddLiquidityParams,
@@ -217,31 +217,31 @@ export class CpAmmKitClient {
   }
 
   getQuote(params: KitGetQuoteParams): KitQuote {
-    return legacyKitMath.getQuote(params);
+    return kitMath.getQuote(params);
   }
 
   getQuote2(params: KitGetQuote2Params): KitQuote2Result {
-    return legacyKitMath.getQuote2(params);
+    return kitMath.getQuote2(params);
   }
 
   getDepositQuote(params: KitGetDepositQuoteParams): KitDepositQuote {
-    return legacyKitMath.getDepositQuote(params);
+    return kitMath.getDepositQuote(params);
   }
 
   getWithdrawQuote(params: KitGetWithdrawQuoteParams): KitWithdrawQuote {
-    return legacyKitMath.getWithdrawQuote(params);
+    return kitMath.getWithdrawQuote(params);
   }
 
   getLiquidityDelta(params: KitLiquidityDeltaParams): BN {
-    return legacyKitMath.getLiquidityDelta(params);
+    return kitMath.getLiquidityDelta(params);
   }
 
   isLockedPosition(position: KitPositionState): boolean {
-    return legacyKitMath.isLockedPosition(position);
+    return kitMath.isLockedPosition(position);
   }
 
   isPermanentLockedPosition(position: KitPositionState): boolean {
-    return legacyKitMath.isPermanentLockedPosition(position);
+    return kitMath.isPermanentLockedPosition(position);
   }
 
   canUnlockPosition(
@@ -249,7 +249,7 @@ export class CpAmmKitClient {
     vestings: readonly KitVestingSnapshot[],
     currentPoint: BN,
   ): { canUnlock: boolean; reason?: string } {
-    return legacyKitMath.canUnlockPosition(positionState, vestings, currentPoint);
+    return kitMath.canUnlockPosition(positionState, vestings, currentPoint);
   }
 
   async createCustomPool(
