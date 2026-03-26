@@ -44,7 +44,23 @@ console.log(plan.instructions.length);
 
 `./kit` is the Kit-native surface. Read methods work directly from `fromRpc(...)` or `fromRpcAndSubscriptions(...)`, and write methods return `KitTransactionPlan` objects with ordered instructions plus explicit signers.
 
+The Kit client now covers the same public read, quote, helper, and write surface as the root client, including `preparePoolCreationSingleSide`, `preparePoolCreationParams`, `swap`, and `swap2`.
+
 Kit-only examples live under [examples/kit](/Users/cjpher/Documents/projects-2026/damm-v2-sdk/examples/kit).
+
+## Migrating From `CpAmm`
+
+This repo includes a Codex skill for migrating downstream app code from `CpAmm` to `CpAmmKitClient`:
+
+- [.codex/skills/cpamm-to-kit-client-migration/SKILL.md](/Users/cjpher/Documents/projects-2026/damm-v2-sdk/.codex/skills/cpamm-to-kit-client-migration/SKILL.md)
+
+Use it when a project needs to:
+
+- replace `new CpAmm(connection)` with `CpAmmKitClient`
+- move from `PublicKey` and `Transaction` flows to `Address` and `KitTransactionPlan`
+- audit a codebase for remaining root-client or `@solana/web3.js` usage
+
+The skill is repo-local for contributors and agents. It includes API mappings and a migration checklist under [.codex/skills/cpamm-to-kit-client-migration/references](/Users/cjpher/Documents/projects-2026/damm-v2-sdk/.codex/skills/cpamm-to-kit-client-migration/references).
 
 ## Legacy Root SDK
 
