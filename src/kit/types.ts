@@ -227,6 +227,30 @@ export type KitGetWithdrawQuoteParams = {
   liquidity: BN;
 };
 
+export type KitPreparePoolCreationParams = {
+  tokenAAmount: BN;
+  tokenBAmount: BN;
+  minSqrtPrice: BN;
+  maxSqrtPrice: BN;
+  tokenAInfo?: KitTransferFeeMintInfo;
+  tokenBInfo?: KitTransferFeeMintInfo;
+  collectFeeMode: CollectFeeMode;
+};
+
+export type KitPreparedPoolCreation = {
+  initSqrtPrice: BN;
+  liquidityDelta: BN;
+};
+
+export type KitPreparePoolCreationSingleSideParams = {
+  tokenAAmount: BN;
+  minSqrtPrice: BN;
+  maxSqrtPrice: BN;
+  initSqrtPrice: BN;
+  tokenAInfo?: KitTransferFeeMintInfo;
+  collectFeeMode: CollectFeeMode;
+};
+
 export type CpAmmKitClientOptions = {
   rpc: Rpc<any>;
   rpcSubscriptions?: RpcSubscriptions<any>;

@@ -9,6 +9,9 @@ import type {
   KitLiquidityDeltaParams,
   KitPoolState,
   KitPositionState,
+  KitPreparedPoolCreation,
+  KitPreparePoolCreationParams,
+  KitPreparePoolCreationSingleSideParams,
   KitQuote,
   KitQuote2Result,
   KitVestingSnapshot,
@@ -22,6 +25,7 @@ import {
   getLiquidityDeltaFromAmountA,
   getLiquidityDeltaFromAmountB,
 } from "./liquidity";
+import { calculateInitSqrtPrice } from "./priceMath";
 import {
   swapQuoteExactInput,
   swapQuoteExactOutput,
@@ -87,6 +91,85 @@ export function getLiquidityDelta(params: KitLiquidityDeltaParams): BN {
   );
 
   return min(liquidityDeltaFromAmountA, liquidityDeltaFromAmountB);
+}
+
+export function preparePoolCreationSingleSide(
+  params: KitPreparePoolCreationSingleSideParams,
+): BN {
+  if (!params.initSqrtPrice.eq(params.minSqrtPrice)) {
+    throw new Error("Only support single side for base token.");
+  }
+
+  const actualAmountIn = params.tokenAInfo
+    ? params.tokenAAmount.sub(
+        calculateTransferFeeIncludedAmount(
+          params.tokenAAmount,
+          params.tokenAInfo.mint,
+          params.tokenAInfo.currentEpoch,
+        ).transferFee,
+      )
+    : params.tokenAAmount;
+
+  return getLiquidityDeltaFromAmountA(
+    actualAmountIn,
+    params.initSqrtPrice,
+    params.maxSqrtPrice,
+    params.collectFeeMode,
+  );
+}
+
+export function preparePoolCreationParams(
+  params: KitPreparePoolCreationParams,
+): KitPreparedPoolCreation {
+  if (params.tokenAAmount.eq(new BN(0)) && params.tokenBAmount.eq(new BN(0))) {
+    throw new Error("Invalid input amount");
+  }
+
+  const actualAmountAIn = params.tokenAInfo
+    ? params.tokenAAmount.sub(
+        calculateTransferFeeIncludedAmount(
+          params.tokenAAmount,
+          params.tokenAInfo.mint,
+          params.tokenAInfo.currentEpoch,
+        ).transferFee,
+      )
+    : params.tokenAAmount;
+
+  const actualAmountBIn = params.tokenBInfo
+    ? params.tokenBAmount.sub(
+        calculateTransferFeeIncludedAmount(
+          params.tokenBAmount,
+          params.tokenBInfo.mint,
+          params.tokenBInfo.currentEpoch,
+        ).transferFee,
+      )
+    : params.tokenBAmount;
+
+  const initSqrtPrice = calculateInitSqrtPrice(
+    params.tokenAAmount,
+    params.tokenBAmount,
+    params.minSqrtPrice,
+    params.maxSqrtPrice,
+  );
+
+  const liquidityDeltaFromAmountA = getLiquidityDeltaFromAmountA(
+    actualAmountAIn,
+    initSqrtPrice,
+    params.maxSqrtPrice,
+    params.collectFeeMode,
+  );
+
+  const liquidityDeltaFromAmountB = getLiquidityDeltaFromAmountB(
+    actualAmountBIn,
+    params.minSqrtPrice,
+    initSqrtPrice,
+    params.collectFeeMode,
+  );
+
+  return {
+    initSqrtPrice,
+    liquidityDelta: min(liquidityDeltaFromAmountA, liquidityDeltaFromAmountB),
+  };
 }
 
 export function getQuote(params: KitGetQuoteParams): KitQuote {

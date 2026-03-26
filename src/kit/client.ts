@@ -73,6 +73,9 @@ import type {
   KitLiquidityDeltaParams,
   KitPoolState,
   KitPositionState,
+  KitPreparedPoolCreation,
+  KitPreparePoolCreationParams,
+  KitPreparePoolCreationSingleSideParams,
   KitQuote,
   KitQuote2Result,
   KitTransactionPlan,
@@ -234,6 +237,18 @@ export class CpAmmKitClient {
 
   getLiquidityDelta(params: KitLiquidityDeltaParams): BN {
     return kitMath.getLiquidityDelta(params);
+  }
+
+  preparePoolCreationSingleSide(
+    params: KitPreparePoolCreationSingleSideParams,
+  ): BN {
+    return kitMath.preparePoolCreationSingleSide(params);
+  }
+
+  preparePoolCreationParams(
+    params: KitPreparePoolCreationParams,
+  ): KitPreparedPoolCreation {
+    return kitMath.preparePoolCreationParams(params);
   }
 
   isLockedPosition(position: KitPositionState): boolean {
