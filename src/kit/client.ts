@@ -98,7 +98,7 @@ export class CpAmmKitClient {
   readonly rpc: Rpc<any>;
   readonly rpcSubscriptions?: RpcSubscriptions<any>;
 
-  private constructor(options: CpAmmKitClientOptions) {
+  private constructor(options: Pick<CpAmmKitClientOptions, "rpc" | "rpcSubscriptions">) {
     this.rpc = options.rpc;
     this.rpcSubscriptions = options.rpcSubscriptions;
   }
@@ -110,7 +110,6 @@ export class CpAmmKitClient {
     return new CpAmmKitClient({
       rpc,
       rpcSubscriptions: options.rpcSubscriptions,
-      legacyRpcUrl: options.legacyRpcUrl,
     });
   }
 
@@ -124,7 +123,6 @@ export class CpAmmKitClient {
     return new CpAmmKitClient({
       rpc: createSolanaRpc(rpcUrl),
       rpcSubscriptions: createSolanaRpcSubscriptions(rpcSubscriptionsUrl),
-      legacyRpcUrl: rpcUrl,
     });
   }
 
@@ -136,7 +134,6 @@ export class CpAmmKitClient {
     return new CpAmmKitClient({
       rpc,
       rpcSubscriptions,
-      legacyRpcUrl: options.legacyRpcUrl,
     });
   }
 

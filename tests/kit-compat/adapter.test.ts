@@ -659,7 +659,7 @@ async function performSwap(
   );
 }
 
-describe("CpAmmKitClient legacy adapter compatibility", () => {
+describe("CpAmmKitClient Kit parity", () => {
   let validator: ValidatorContext;
   let rpcBundle: KitRpcBundle;
 

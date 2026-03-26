@@ -254,6 +254,7 @@ export type KitPreparePoolCreationSingleSideParams = {
 export type CpAmmKitClientOptions = {
   rpc: Rpc<any>;
   rpcSubscriptions?: RpcSubscriptions<any>;
+  /** @deprecated Compatibility-only. Do not add this to new Kit client code. */
   legacyRpcUrl?: string;
 };
 
