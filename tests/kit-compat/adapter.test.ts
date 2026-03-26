@@ -1373,6 +1373,167 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
     ).toBeNull();
   });
 
+  it("builds parity plans and executes mergePosition", async () => {
+    const fixture = await createCustomPoolFixture(validator, rpcBundle);
+    const positionB = await createPositionWithLiquidity(
+      validator,
+      fixture,
+      fixture.actors.user,
+      fixture.actors.userSigner,
+      new BN(200 * 10 ** DECIMALS),
+    );
+    const positionA = await createPositionWithLiquidity(
+      validator,
+      fixture,
+      fixture.actors.user,
+      fixture.actors.userSigner,
+      new BN(150 * 10 ** DECIMALS),
+    );
+
+    const legacyPoolState = await fixture.legacyClient.fetchPoolState(
+      fixture.poolAddress,
+    );
+    const legacyPositionBState = await fixture.legacyClient.fetchPositionState(
+      positionB.position,
+    );
+    const kitPoolState = await fetchKitPoolState(
+      fixture.kitClient,
+      fixture.poolAddress,
+    );
+    const kitPositionBState = await fetchKitPositionState(
+      fixture.kitClient,
+      positionB.position,
+    );
+
+    const legacyMergeTx = await fixture.legacyClient.mergePosition({
+      owner: fixture.actors.user.publicKey,
+      positionA: positionA.position,
+      positionB: positionB.position,
+      poolState: legacyPoolState,
+      positionANftAccount: positionA.positionNftAccount,
+      positionBNftAccount: positionB.positionNftAccount,
+      positionBState: legacyPositionBState,
+      tokenAAmountAddLiquidityThreshold: new BN(U64_MAX.toString()),
+      tokenBAmountAddLiquidityThreshold: new BN(U64_MAX.toString()),
+      tokenAAmountRemoveLiquidityThreshold: new BN(0),
+      tokenBAmountRemoveLiquidityThreshold: new BN(0),
+      positionBVestings: [],
+      currentPoint: new BN(Math.floor(Date.now() / 1000)),
+    });
+    const kitMergePlan = await fixture.kitClient.mergePosition({
+      owner: fixture.actors.userSigner,
+      positionA: addressFromPublicKey(positionA.position),
+      positionB: addressFromPublicKey(positionB.position),
+      poolState: kitPoolState,
+      positionANftAccount: addressFromPublicKey(positionA.positionNftAccount),
+      positionBNftAccount: addressFromPublicKey(positionB.positionNftAccount),
+      positionBState: kitPositionBState,
+      tokenAAmountAddLiquidityThreshold: new BN(U64_MAX.toString()),
+      tokenBAmountAddLiquidityThreshold: new BN(U64_MAX.toString()),
+      tokenAAmountRemoveLiquidityThreshold: new BN(0),
+      tokenBAmountRemoveLiquidityThreshold: new BN(0),
+      positionBVestings: [],
+      currentPoint: new BN(Math.floor(Date.now() / 1000)),
+    });
+
+    expectPlanParity(legacyMergeTx, kitMergePlan, [
+      fixture.actors.userSigner.address,
+    ]);
+
+    await executeKitPlan(kitMergePlan, fixture.actors.userSigner, rpcBundle);
+
+    expect(await validator.connection.getAccountInfo(positionB.position)).toBeNull();
+  });
+
+  it("matches legacy unlock rejection for incomplete vesting on removeAllLiquidityAndClosePosition", async () => {
+    const fixture = await createCustomPoolFixture(validator, rpcBundle);
+    const userPosition = await createPositionWithLiquidity(
+      validator,
+      fixture,
+      fixture.actors.user,
+      fixture.actors.userSigner,
+    );
+    const unlockedPositionState = await fixture.legacyClient.fetchPositionState(
+      userPosition.position,
+    );
+    const vestingAccount = Keypair.generate();
+    const cliffPoint = new BN(Math.floor(Date.now() / 1000) + 600);
+
+    const legacyLockTx = await fixture.legacyClient.lockPosition({
+      owner: fixture.actors.user.publicKey,
+      payer: fixture.actors.user.publicKey,
+      position: userPosition.position,
+      positionNftAccount: userPosition.positionNftAccount,
+      pool: fixture.poolAddress,
+      cliffPoint,
+      periodFrequency: new BN(60),
+      cliffUnlockLiquidity: new BN(0),
+      liquidityPerPeriod: unlockedPositionState.unlockedLiquidity,
+      numberOfPeriod: 1,
+      vestingAccount: vestingAccount.publicKey,
+    });
+    await executeLegacyBuilder(
+      validator.connection,
+      legacyLockTx,
+      [fixture.actors.user, vestingAccount],
+      fixture.actors.user,
+    );
+
+    const [
+      legacyPoolState,
+      legacyPositionState,
+      kitPoolState,
+      kitPositionState,
+      legacyVestings,
+      kitVestings,
+    ] = await Promise.all([
+      fixture.legacyClient.fetchPoolState(fixture.poolAddress),
+      fixture.legacyClient.fetchPositionState(userPosition.position),
+      fetchKitPoolState(fixture.kitClient, fixture.poolAddress),
+      fetchKitPositionState(fixture.kitClient, userPosition.position),
+      fixture.legacyClient.getAllVestingsByPosition(userPosition.position),
+      fixture.kitClient.getAllVestingsByPosition(
+        addressFromPublicKey(userPosition.position),
+      ),
+    ]);
+    const currentPoint = new BN(Math.floor(Date.now() / 1000));
+
+    await expect(
+      fixture.legacyClient.removeAllLiquidityAndClosePosition({
+        owner: fixture.actors.user.publicKey,
+        position: userPosition.position,
+        positionNftAccount: userPosition.positionNftAccount,
+        poolState: legacyPoolState,
+        positionState: legacyPositionState,
+        tokenAAmountThreshold: new BN(0),
+        tokenBAmountThreshold: new BN(0),
+        vestings: legacyVestings.map(({ publicKey, account }) => ({
+          account: publicKey,
+          vestingState: account,
+        })),
+        currentPoint,
+      }),
+    ).rejects.toThrow(
+      "Cannot remove liquidity: Position has incomplete vesting schedule",
+    );
+
+    await expect(
+      fixture.kitClient.removeAllLiquidityAndClosePosition({
+        owner: fixture.actors.userSigner,
+        position: addressFromPublicKey(userPosition.position),
+        positionNftAccount: addressFromPublicKey(userPosition.positionNftAccount),
+        poolState: kitPoolState,
+        positionState: kitPositionState,
+        tokenAAmountThreshold: new BN(0),
+        tokenBAmountThreshold: new BN(0),
+        vestings: kitVestings,
+        currentPoint,
+      }),
+    ).rejects.toThrow(
+      "Cannot remove liquidity: Position has incomplete vesting schedule",
+    );
+  });
+
   it("builds parity plans and executes permanentLockPosition and splitPosition2", async () => {
     const fixture = await createCustomPoolFixture(validator, rpcBundle);
     const initialPositionNftAccount = derivePositionNftAccount(
@@ -1795,8 +1956,14 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
 
     expect(clientSource).not.toContain("LegacyKitBridge");
     expect(clientSource).not.toContain("assertLegacyBridge");
+    expect(clientSource).not.toContain("legacyKitMath");
 
-    for (const outputPath of ["dist/kit/index.js", "dist/kit/index.mjs"]) {
+    for (const outputPath of [
+      "dist/kit/index.js",
+      "dist/kit/index.mjs",
+      "dist/kit/index.d.ts",
+      "dist/kit/index.d.mts",
+    ]) {
       if (!existsSync(outputPath)) {
         continue;
       }
@@ -1804,6 +1971,8 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
       const output = readFileSync(outputPath, "utf8");
       expect(output).not.toContain("legacyKitBridge");
       expect(output).not.toContain("assertLegacyBridge");
+      expect(output).not.toContain("@solana/web3.js");
+      expect(output).not.toContain("@coral-xyz/anchor");
     }
   });
 

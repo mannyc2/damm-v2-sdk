@@ -34,9 +34,10 @@
 		"clean": "rm -rf dist && rm -rf node_modules",
 		"start": "npm run build -- --watch",
 		"check:kit-imports": "tsx scripts/check-kit-imports.ts",
+		"check:kit-no-web3": "tsx scripts/check-kit-no-web3.ts",
 		"test": "vitest run",
 		"test:kit-compat": "vitest run tests/kit-compat",
-		"test:all": "pnpm check:kit-imports && pnpm build && pnpm check-types && pnpm test && pnpm test:kit-compat",
+		"test:all": "pnpm check:kit-imports && pnpm build && pnpm check:kit-no-web3 && pnpm check-types && pnpm test && pnpm test:kit-compat",
 		"generate:kit": "tsx scripts/generate-kit-client.ts",
 		"check-types": "tsc --noEmit"
 	},
