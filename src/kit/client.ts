@@ -30,6 +30,7 @@ import {
   removeLiquidityPlan,
   splitPosition2Plan,
   splitPositionPlan,
+  swapPlan,
   swap2Plan,
   updateRewardDurationPlan,
   updateRewardFunderPlan,
@@ -86,6 +87,7 @@ import type {
   RemoveLiquidityParams,
   SplitPosition2Params,
   SplitPositionParams,
+  SwapParams,
   Swap2Params,
   UpdateRewardDurationParams,
   UpdateRewardFunderParams,
@@ -395,6 +397,10 @@ export class CpAmmKitClient {
 
   async claimReward(params: ClaimRewardParams): Promise<KitTransactionPlan> {
     return await claimRewardPlan(params);
+  }
+
+  async swap(params: SwapParams): Promise<KitTransactionPlan> {
+    return await swapPlan(this.rpc, params);
   }
 
   async swap2(params: Swap2Params): Promise<KitTransactionPlan> {

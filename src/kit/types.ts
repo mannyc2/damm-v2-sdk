@@ -583,6 +583,24 @@ export type ClaimRewardParams = {
   feePayer?: TransactionSigner;
 };
 
+export type SwapParams = {
+  payer: TransactionSigner;
+  pool: Address;
+  inputTokenMint: Address;
+  outputTokenMint: Address;
+  amountIn: BN;
+  minimumAmountOut: BN;
+  tokenAMint: Address;
+  tokenBMint: Address;
+  tokenAVault: Address;
+  tokenBVault: Address;
+  tokenAProgram: Address;
+  tokenBProgram: Address;
+  referralTokenAccount: Address | null;
+  receiver?: Address;
+  poolState?: KitPoolState;
+};
+
 export type Swap2Params = {
   payer: TransactionSigner;
   pool: Address;

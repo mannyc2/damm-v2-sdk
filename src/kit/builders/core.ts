@@ -22,6 +22,7 @@ import {
   type KitPoolFeesParams,
   type KitPoolState,
   type KitTransactionPlan,
+  type SwapParams,
   type Swap2Params,
 } from "../types";
 import {
@@ -35,6 +36,7 @@ import {
   getInitializePoolInstructionAsync,
   getInitializePoolWithDynamicConfigInstructionAsync,
   getPermanentLockPositionInstructionAsync,
+  getSwapInstructionAsync,
   getSwap2InstructionAsync,
 } from "../generated";
 import { decodePodAlignedFeeRateLimiter } from "../helpers/feeCodec";
@@ -677,6 +679,119 @@ export async function swap2Plan(
         amount1: bnToBigInt(amount1),
         swapMode: params.swapMode,
       },
+    }),
+    remainingAccounts,
+  );
+
+  return buildTransactionPlan(
+    [...preInstructions, swapInstruction, ...postInstructions],
+    [params.payer],
+  );
+}
+
+export async function swapPlan(
+  rpc: Rpc<any>,
+  params: SwapParams,
+): Promise<KitTransactionPlan> {
+  if (params.amountIn.isZero()) {
+    throw new AmountIsZeroError("amountIn must be greater than 0");
+  }
+
+  const isInputTokenA = params.inputTokenMint === params.tokenAMint;
+  const inputTokenProgram = isInputTokenA
+    ? params.tokenAProgram
+    : params.tokenBProgram;
+  const outputTokenProgram = isInputTokenA
+    ? params.tokenBProgram
+    : params.tokenAProgram;
+  const tokenOwner = params.receiver ?? params.payer.address;
+
+  const {
+    tokenAAta: inputTokenAccount,
+    tokenBAta: outputTokenAccount,
+    instructions: preInstructions,
+  } = await prepareTokenAccounts({
+    payer: params.payer,
+    tokenAOwner: tokenOwner,
+    tokenBOwner: tokenOwner,
+    tokenAMint: params.inputTokenMint,
+    tokenBMint: params.outputTokenMint,
+    tokenAProgram: inputTokenProgram,
+    tokenBProgram: outputTokenProgram,
+  });
+
+  if (isNativeMint(params.inputTokenMint)) {
+    const wrapSource = params.receiver ?? params.payer.address;
+    preInstructions.push(
+      ...wrapSolInstructions(
+        wrapSource,
+        params.payer,
+        inputTokenAccount,
+        bnToBigInt(params.amountIn),
+      ),
+    );
+  }
+
+  const postInstructions: Instruction[] = [];
+  if (isNativeMint(params.tokenAMint) || isNativeMint(params.tokenBMint)) {
+    postInstructions.push(
+      await unwrapSolInstruction(
+        params.receiver ?? params.payer.address,
+        params.payer,
+        params.receiver ?? params.payer.address,
+      ),
+    );
+  }
+
+  const poolState =
+    params.poolState ?? (await readServices.fetchPoolState(rpc, params.pool));
+  const baseFeeData = Buffer.from(poolState.poolFees.baseFee.baseFeeInfo.data);
+  const baseFeeMode = baseFeeData.readUInt8(8) as BaseFeeMode;
+
+  let remainingAccounts: readonly AccountMeta<Address>[] = [];
+  if (baseFeeMode === BaseFeeMode.RateLimiter) {
+    const currentPoint = await getCurrentPoint(
+      rpc,
+      poolState.activationType as ActivationType,
+    );
+    const rateLimiter = decodePodAlignedFeeRateLimiter(baseFeeData) as {
+      referenceAmount: BN;
+      maxLimiterDuration: number;
+      maxFeeBps: number;
+      feeIncrementBps: number;
+    };
+    const rateLimiterApplied = isRateLimiterApplied({
+      referenceAmount: rateLimiter.referenceAmount,
+      maxLimiterDuration: rateLimiter.maxLimiterDuration,
+      maxFeeBps: rateLimiter.maxFeeBps,
+      feeIncrementBps: rateLimiter.feeIncrementBps,
+      currentPoint,
+      activationPoint: poolState.activationPoint,
+      isAtoB: isInputTokenA,
+    });
+
+    if (rateLimiterApplied) {
+      remainingAccounts = [readonlyAccountMeta(SYSVAR_INSTRUCTIONS_ADDRESS)];
+    }
+  }
+
+  const swapInstruction = appendRemainingAccounts(
+    await getSwapInstructionAsync({
+      poolAuthority: POOL_AUTHORITY_ADDRESS,
+      pool: params.pool,
+      inputTokenAccount,
+      outputTokenAccount,
+      tokenAVault: params.tokenAVault,
+      tokenBVault: params.tokenBVault,
+      tokenAMint: params.tokenAMint,
+      tokenBMint: params.tokenBMint,
+      payer: params.payer,
+      tokenAProgram: params.tokenAProgram,
+      tokenBProgram: params.tokenBProgram,
+      referralTokenAccount: params.referralTokenAccount ?? undefined,
+      program: CP_AMM_PROGRAM_ADDRESS,
+      amountIn: bnToBigInt(params.amountIn),
+      minimumAmountOut: bnToBigInt(params.minimumAmountOut),
     }),
     remainingAccounts,
   );
