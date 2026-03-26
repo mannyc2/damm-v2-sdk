@@ -1,0 +1,4 @@
+interface:
+  display_name: "CpAmm to Kit Migration"
+  short_description: "Migrate apps from CpAmm to CpAmmKitClient"
+  default_prompt: "Use $cpamm-to-kit-client-migration to migrate this project from CpAmm to CpAmmKitClient."
