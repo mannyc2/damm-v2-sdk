@@ -12,10 +12,22 @@ import { LegacyKitBridge } from "../internal/legacyKitBridge";
 import * as legacyKitMath from "../internal/legacyKitMath";
 import { adaptLegacyPoolResult, adaptLegacyTransaction } from "./adapters/legacy";
 import {
+  addLiquidityPlan,
+  closePositionPlan,
+  createPositionAndAddLiquidityPlan,
   createCustomPoolPlan,
   createCustomPoolWithDynamicConfigPlan,
   createPoolPlan,
   createPositionPlan,
+  lockPositionPlan,
+  mergePositionPlan,
+  permanentLockPositionPlan,
+  refreshVestingPlan,
+  removeAllLiquidityAndClosePositionPlan,
+  removeAllLiquidityPlan,
+  removeLiquidityPlan,
+  splitPosition2Plan,
+  splitPositionPlan,
   swap2Plan,
 } from "./builders";
 import { getDefaultRpcSubscriptionsUrl } from "./helpers";
@@ -319,308 +331,63 @@ export class CpAmmKitClient {
   }
 
   async addLiquidity(params: AddLiquidityParams): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "addLiquidity");
-
-    const transaction = await legacyBridge.addLiquidity({
-      owner: signerAddress(params.owner),
-      position: addressString(params.position),
-      pool: addressString(params.pool),
-      positionNftAccount: addressString(params.positionNftAccount),
-      liquidityDelta: params.liquidityDelta,
-      maxAmountTokenA: params.maxAmountTokenA,
-      maxAmountTokenB: params.maxAmountTokenB,
-      tokenAAmountThreshold: params.tokenAAmountThreshold,
-      tokenBAmountThreshold: params.tokenBAmountThreshold,
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      tokenAVault: addressString(params.tokenAVault),
-      tokenBVault: addressString(params.tokenBVault),
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+    return await addLiquidityPlan(params);
   }
 
   async createPositionAndAddLiquidity(
     params: CreatePositionAndAddLiquidityParams,
   ): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(
-      this.legacyBridge,
-      "createPositionAndAddLiquidity",
-    );
-
-    const transaction = await legacyBridge.createPositionAndAddLiquidity({
-      owner: signerAddress(params.owner),
-      pool: addressString(params.pool),
-      positionNft: signerAddress(params.positionNft),
-      liquidityDelta: params.liquidityDelta,
-      maxAmountTokenA: params.maxAmountTokenA,
-      maxAmountTokenB: params.maxAmountTokenB,
-      tokenAAmountThreshold: params.tokenAAmountThreshold,
-      tokenBAmountThreshold: params.tokenBAmountThreshold,
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-    });
-
-    return adaptLegacyTransaction(
-      transaction,
-      planSigners(params.owner, params.positionNft),
-    );
+    return await createPositionAndAddLiquidityPlan(params);
   }
 
   async removeLiquidity(
     params: RemoveLiquidityParams,
   ): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "removeLiquidity");
-
-    const transaction = await legacyBridge.removeLiquidity({
-      owner: signerAddress(params.owner),
-      position: addressString(params.position),
-      pool: addressString(params.pool),
-      positionNftAccount: addressString(params.positionNftAccount),
-      liquidityDelta: params.liquidityDelta,
-      tokenAAmountThreshold: params.tokenAAmountThreshold,
-      tokenBAmountThreshold: params.tokenBAmountThreshold,
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      tokenAVault: addressString(params.tokenAVault),
-      tokenBVault: addressString(params.tokenBVault),
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-      vestings: params.vestings.map(({ account, vestingState }) => ({
-        account: addressString(account),
-        vestingState,
-      })),
-      currentPoint: params.currentPoint,
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+    return await removeLiquidityPlan(params);
   }
 
   async removeAllLiquidity(
     params: RemoveAllLiquidityParams,
   ): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(
-      this.legacyBridge,
-      "removeAllLiquidity",
-    );
-
-    const transaction = await legacyBridge.removeAllLiquidity({
-      owner: signerAddress(params.owner),
-      position: addressString(params.position),
-      pool: addressString(params.pool),
-      positionNftAccount: addressString(params.positionNftAccount),
-      tokenAAmountThreshold: params.tokenAAmountThreshold,
-      tokenBAmountThreshold: params.tokenBAmountThreshold,
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      tokenAVault: addressString(params.tokenAVault),
-      tokenBVault: addressString(params.tokenBVault),
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-      vestings: params.vestings.map(({ account, vestingState }) => ({
-        account: addressString(account),
-        vestingState,
-      })),
-      currentPoint: params.currentPoint,
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+    return await removeAllLiquidityPlan(params);
   }
 
   async removeAllLiquidityAndClosePosition(
     params: RemoveAllLiquidityAndClosePositionParams,
   ): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(
-      this.legacyBridge,
-      "removeAllLiquidityAndClosePosition",
-    );
-
-    const transaction = await legacyBridge.removeAllLiquidityAndClosePosition({
-      owner: signerAddress(params.owner),
-      position: addressString(params.position),
-      positionNftAccount: addressString(params.positionNftAccount),
-      poolState: params.poolState,
-      positionState: params.positionState,
-      tokenAAmountThreshold: params.tokenAAmountThreshold,
-      tokenBAmountThreshold: params.tokenBAmountThreshold,
-      vestings: params.vestings.map(({ account, vestingState }) => ({
-        account: addressString(account),
-        vestingState,
-      })),
-      currentPoint: params.currentPoint,
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+    return await removeAllLiquidityAndClosePositionPlan(params);
   }
 
   async lockPosition(params: LockPositionParams): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "lockPosition");
-
-    const transaction = await legacyBridge.lockPosition(
-      "innerPosition" in params && params.innerPosition
-        ? {
-            owner: signerAddress(params.owner),
-            position: addressString(params.position),
-            positionNftAccount: addressString(params.positionNftAccount),
-            pool: addressString(params.pool),
-            cliffPoint: params.cliffPoint,
-            periodFrequency: params.periodFrequency,
-            cliffUnlockLiquidity: params.cliffUnlockLiquidity,
-            liquidityPerPeriod: params.liquidityPerPeriod,
-            numberOfPeriod: params.numberOfPeriod,
-            innerPosition: true,
-          }
-        : {
-            owner: signerAddress(params.owner),
-            payer: signerAddress(params.payer),
-            position: addressString(params.position),
-            positionNftAccount: addressString(params.positionNftAccount),
-            pool: addressString(params.pool),
-            cliffPoint: params.cliffPoint,
-            periodFrequency: params.periodFrequency,
-            cliffUnlockLiquidity: params.cliffUnlockLiquidity,
-            liquidityPerPeriod: params.liquidityPerPeriod,
-            numberOfPeriod: params.numberOfPeriod,
-            innerPosition: false,
-            vestingAccount: signerAddress(params.vestingAccount),
-          },
-    );
-
-    return adaptLegacyTransaction(
-      transaction,
-      "innerPosition" in params && params.innerPosition
-        ? planSigners(params.owner)
-        : planSigners(params.owner, params.payer, params.vestingAccount),
-    );
+    return await lockPositionPlan(params);
   }
 
   async permanentLockPosition(
     params: PermanentLockPositionParams,
   ): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(
-      this.legacyBridge,
-      "permanentLockPosition",
-    );
-
-    const transaction = await legacyBridge.permanentLockPosition({
-      owner: signerAddress(params.owner),
-      position: addressString(params.position),
-      positionNftAccount: addressString(params.positionNftAccount),
-      pool: addressString(params.pool),
-      unlockedLiquidity: params.unlockedLiquidity,
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+    return await permanentLockPositionPlan(params);
   }
 
   async refreshVesting(
     params: RefreshVestingParams,
   ): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "refreshVesting");
-
-    const transaction = await legacyBridge.refreshVesting({
-      owner: addressString(params.owner),
-      position: addressString(params.position),
-      positionNftAccount: addressString(params.positionNftAccount),
-      pool: addressString(params.pool),
-      vestingAccounts: params.vestingAccounts.map(addressString),
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners());
+    return await refreshVestingPlan(params);
   }
 
   async closePosition(params: ClosePositionParams): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "closePosition");
-
-    const transaction = await legacyBridge.closePosition({
-      owner: signerAddress(params.owner),
-      pool: addressString(params.pool),
-      position: addressString(params.position),
-      positionNftMint: addressString(params.positionNftMint),
-      positionNftAccount: addressString(params.positionNftAccount),
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+    return await closePositionPlan(params);
   }
 
   async mergePosition(params: MergePositionParams): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "mergePosition");
-
-    const transaction = await legacyBridge.mergePosition({
-      owner: signerAddress(params.owner),
-      positionA: addressString(params.positionA),
-      positionB: addressString(params.positionB),
-      poolState: params.poolState,
-      positionBNftAccount: addressString(params.positionBNftAccount),
-      positionANftAccount: addressString(params.positionANftAccount),
-      positionBState: params.positionBState,
-      tokenAAmountAddLiquidityThreshold: params.tokenAAmountAddLiquidityThreshold,
-      tokenBAmountAddLiquidityThreshold: params.tokenBAmountAddLiquidityThreshold,
-      tokenAAmountRemoveLiquidityThreshold:
-        params.tokenAAmountRemoveLiquidityThreshold,
-      tokenBAmountRemoveLiquidityThreshold:
-        params.tokenBAmountRemoveLiquidityThreshold,
-      positionBVestings: params.positionBVestings.map(
-        ({ account, vestingState }) => ({
-          account: addressString(account),
-          vestingState,
-        }),
-      ),
-      currentPoint: params.currentPoint,
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.owner));
+    return await mergePositionPlan(params);
   }
 
   async splitPosition(params: SplitPositionParams): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "splitPosition");
-
-    const transaction = await legacyBridge.splitPosition({
-      firstPositionOwner: signerAddress(params.firstPositionOwner),
-      secondPositionOwner: signerAddress(params.secondPositionOwner),
-      pool: addressString(params.pool),
-      firstPosition: addressString(params.firstPosition),
-      firstPositionNftAccount: addressString(params.firstPositionNftAccount),
-      secondPosition: addressString(params.secondPosition),
-      secondPositionNftAccount: addressString(params.secondPositionNftAccount),
-      permanentLockedLiquidityPercentage:
-        params.permanentLockedLiquidityPercentage,
-      unlockedLiquidityPercentage: params.unlockedLiquidityPercentage,
-      feeAPercentage: params.feeAPercentage,
-      feeBPercentage: params.feeBPercentage,
-      reward0Percentage: params.reward0Percentage,
-      reward1Percentage: params.reward1Percentage,
-      innerVestingLiquidityPercentage: params.innerVestingLiquidityPercentage,
-    });
-
-    return adaptLegacyTransaction(
-      transaction,
-      planSigners(params.firstPositionOwner, params.secondPositionOwner),
-    );
+    return await splitPositionPlan(params);
   }
 
   async splitPosition2(params: SplitPosition2Params): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "splitPosition2");
-
-    const transaction = await legacyBridge.splitPosition2({
-      firstPositionOwner: signerAddress(params.firstPositionOwner),
-      secondPositionOwner: signerAddress(params.secondPositionOwner),
-      pool: addressString(params.pool),
-      firstPosition: addressString(params.firstPosition),
-      firstPositionNftAccount: addressString(params.firstPositionNftAccount),
-      secondPosition: addressString(params.secondPosition),
-      secondPositionNftAccount: addressString(params.secondPositionNftAccount),
-      numerator: params.numerator,
-    });
-
-    return adaptLegacyTransaction(
-      transaction,
-      planSigners(params.firstPositionOwner, params.secondPositionOwner),
-    );
+    return await splitPosition2Plan(params);
   }
 
   async claimPositionFee(
