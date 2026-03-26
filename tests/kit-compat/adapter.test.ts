@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+
 import BN from "bn.js";
 import {
   createAssociatedTokenAccountInstruction,
@@ -15,6 +17,7 @@ import {
   compileTransaction,
   createKeyPairSignerFromBytes,
   createSolanaRpc,
+  createSolanaRpcSubscriptions,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   pipe,
@@ -100,6 +103,12 @@ async function createKitSigner(keypair: Keypair): Promise<TransactionSigner> {
 
 function addressFromPublicKey(publicKey: PublicKey): Address {
   return address(publicKey.toBase58());
+}
+
+function rpcSubscriptionsUrl(rpcUrl: string) {
+  const parsedUrl = new URL(rpcUrl);
+  parsedUrl.protocol = parsedUrl.protocol === "https:" ? "wss:" : "ws:";
+  return parsedUrl.toString();
 }
 
 async function fetchKitPoolState(
@@ -1720,20 +1729,82 @@ describe("CpAmmKitClient legacy adapter compatibility", () => {
     );
   });
 
-  it("requires an explicit legacy RPC URL when reusing an existing Kit RPC client", async () => {
-    const rpc = createSolanaRpc("http://127.0.0.1:1");
-    const client = CpAmmKitClient.fromRpc(rpc);
-    const payer = await createKitSigner(Keypair.generate());
-    const positionNft = await createKitSigner(Keypair.generate());
+  it("builds native write plans without a legacy RPC URL when reusing existing Kit RPC clients", async () => {
+    const fixture = await createCustomPoolFixture(validator, rpcBundle);
+    const rpcOnlyClient = CpAmmKitClient.fromRpc(rpcBundle.rpc);
+    const rpcAndSubscriptionsClient = CpAmmKitClient.fromRpcAndSubscriptions(
+      rpcBundle.rpc,
+      createSolanaRpcSubscriptions(rpcSubscriptionsUrl(validator.rpcUrl)),
+    );
+    const firstPositionNft = Keypair.generate();
+    const firstPositionNftSigner = await createKitSigner(firstPositionNft);
+    const secondPositionNft = Keypair.generate();
+    const secondPositionNftSigner = await createKitSigner(secondPositionNft);
 
-    await expect(
-      client.createPosition({
-        owner: payer.address,
-        payer,
-        pool: address("11111111111111111111111111111111"),
-        positionNft,
-      }),
-    ).rejects.toThrow("createPosition requires a legacy bridge");
+    const rpcOnlyPlan = await rpcOnlyClient.createPosition({
+      owner: fixture.actors.userSigner.address,
+      payer: fixture.actors.userSigner,
+      pool: addressFromPublicKey(fixture.poolAddress),
+      positionNft: firstPositionNftSigner,
+    });
+    const rpcAndSubscriptionsPlan =
+      await rpcAndSubscriptionsClient.createPosition({
+        owner: fixture.actors.userSigner.address,
+        payer: fixture.actors.userSigner,
+        pool: addressFromPublicKey(fixture.poolAddress),
+        positionNft: secondPositionNftSigner,
+      });
+
+    expect(rpcOnlyPlan.signers.map((signer) => signer.address)).toEqual([
+      fixture.actors.userSigner.address,
+      firstPositionNftSigner.address,
+    ]);
+    expect(
+      rpcAndSubscriptionsPlan.signers.map((signer) => signer.address),
+    ).toEqual([
+      fixture.actors.userSigner.address,
+      secondPositionNftSigner.address,
+    ]);
+
+    await executeKitPlan(rpcOnlyPlan, fixture.actors.userSigner, rpcBundle);
+    await executeKitPlan(
+      rpcAndSubscriptionsPlan,
+      fixture.actors.userSigner,
+      rpcBundle,
+    );
+
+    const [firstPositionState, secondPositionState] = await Promise.all([
+      fixture.legacyClient.fetchPositionState(
+        derivePositionAddress(firstPositionNft.publicKey),
+      ),
+      fixture.legacyClient.fetchPositionState(
+        derivePositionAddress(secondPositionNft.publicKey),
+      ),
+    ]);
+
+    expect(firstPositionState.nftMint.equals(firstPositionNft.publicKey)).toBe(
+      true,
+    );
+    expect(secondPositionState.nftMint.equals(secondPositionNft.publicKey)).toBe(
+      true,
+    );
+  });
+
+  it("does not retain legacy bridge references in the kit client source or build output", () => {
+    const clientSource = readFileSync("src/kit/client.ts", "utf8");
+
+    expect(clientSource).not.toContain("LegacyKitBridge");
+    expect(clientSource).not.toContain("assertLegacyBridge");
+
+    for (const outputPath of ["dist/kit/index.js", "dist/kit/index.mjs"]) {
+      if (!existsSync(outputPath)) {
+        continue;
+      }
+
+      const output = readFileSync(outputPath, "utf8");
+      expect(output).not.toContain("legacyKitBridge");
+      expect(output).not.toContain("assertLegacyBridge");
+    }
   });
 
   it("matches legacy read and discovery surfaces with native kit reads", async () => {
