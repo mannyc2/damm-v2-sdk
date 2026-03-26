@@ -39,7 +39,15 @@ export function buildTransactionPlan(
   signers: readonly OptionalSigner[],
 ): KitTransactionPlan {
   return {
-    instructions,
+    instructions: instructions.map((instruction) => {
+      return Object.freeze({
+        ...instruction,
+        accounts: instruction.accounts.map(({ address, role }) => ({
+          address,
+          role,
+        })),
+      }) as Instruction;
+    }),
     signers: deduplicateSigners(signers),
   };
 }
@@ -69,6 +77,19 @@ export function appendRemainingAccounts<TInstruction extends Instruction>(
   return Object.freeze({
     ...instruction,
     accounts: [...instruction.accounts, ...remainingAccounts],
+  }) as TInstruction;
+}
+
+export function replaceInstructionAccount<TInstruction extends Instruction>(
+  instruction: TInstruction,
+  index: number,
+  account: AccountMeta<Address>,
+): TInstruction {
+  return Object.freeze({
+    ...instruction,
+    accounts: instruction.accounts.map((currentAccount, currentIndex) =>
+      currentIndex === index ? account : currentAccount,
+    ),
   }) as TInstruction;
 }
 

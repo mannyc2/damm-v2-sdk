@@ -11,6 +11,13 @@ import type BN from "bn.js";
 import { LegacyKitBridge } from "../internal/legacyKitBridge";
 import * as legacyKitMath from "../internal/legacyKitMath";
 import { adaptLegacyPoolResult, adaptLegacyTransaction } from "./adapters/legacy";
+import {
+  createCustomPoolPlan,
+  createCustomPoolWithDynamicConfigPlan,
+  createPoolPlan,
+  createPositionPlan,
+  swap2Plan,
+} from "./builders";
 import { getDefaultRpcSubscriptionsUrl } from "./helpers";
 import * as readServices from "./services";
 import type {
@@ -294,117 +301,21 @@ export class CpAmmKitClient {
   async createCustomPool(
     params: CreateCustomPoolParams,
   ): Promise<CreateCustomPoolResult> {
-    const legacyBridge = assertLegacyBridge(
-      this.legacyBridge,
-      "createCustomPool",
-    );
-
-    const result = await legacyBridge.createCustomPool({
-      payer: signerAddress(params.payer),
-      creator: addressString(params.creator),
-      positionNft: signerAddress(params.positionNft),
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      tokenAAmount: params.tokenAAmount,
-      tokenBAmount: params.tokenBAmount,
-      sqrtMinPrice: params.sqrtMinPrice,
-      sqrtMaxPrice: params.sqrtMaxPrice,
-      liquidityDelta: params.liquidityDelta,
-      initSqrtPrice: params.initSqrtPrice,
-      poolFees: params.poolFees,
-      hasAlphaVault: params.hasAlphaVault,
-      activationType: params.activationType,
-      collectFeeMode: params.collectFeeMode,
-      activationPoint: params.activationPoint,
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-      isLockLiquidity: params.isLockLiquidity,
-    });
-
-    return adaptLegacyPoolResult(
-      result,
-      planSigners(params.payer, params.positionNft),
-    );
+    return await createCustomPoolPlan(params);
   }
 
   async createCustomPoolWithDynamicConfig(
     params: CreateCustomPoolWithDynamicConfigParams,
   ): Promise<CreateCustomPoolWithDynamicConfigResult> {
-    const legacyBridge = assertLegacyBridge(
-      this.legacyBridge,
-      "createCustomPoolWithDynamicConfig",
-    );
-
-    const result = await legacyBridge.createCustomPoolWithDynamicConfig({
-      payer: signerAddress(params.payer),
-      creator: signerAddress(params.creator),
-      positionNft: signerAddress(params.positionNft),
-      config: addressString(params.config),
-      poolCreatorAuthority: addressString(params.poolCreatorAuthority),
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      tokenAAmount: params.tokenAAmount,
-      tokenBAmount: params.tokenBAmount,
-      sqrtMinPrice: params.sqrtMinPrice,
-      sqrtMaxPrice: params.sqrtMaxPrice,
-      liquidityDelta: params.liquidityDelta,
-      initSqrtPrice: params.initSqrtPrice,
-      poolFees: params.poolFees,
-      hasAlphaVault: params.hasAlphaVault,
-      activationType: params.activationType,
-      collectFeeMode: params.collectFeeMode,
-      activationPoint: params.activationPoint,
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-      isLockLiquidity: params.isLockLiquidity,
-    });
-
-    return adaptLegacyPoolResult(
-      result,
-      planSigners(params.payer, params.positionNft, params.creator),
-    );
+    return await createCustomPoolWithDynamicConfigPlan(params);
   }
 
   async createPool(params: CreatePoolParams): Promise<CreatePoolResult> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "createPool");
-
-    const result = await legacyBridge.createPool({
-      creator: addressString(params.creator),
-      payer: signerAddress(params.payer),
-      config: addressString(params.config),
-      positionNft: signerAddress(params.positionNft),
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      initSqrtPrice: params.initSqrtPrice,
-      liquidityDelta: params.liquidityDelta,
-      tokenAAmount: params.tokenAAmount,
-      tokenBAmount: params.tokenBAmount,
-      activationPoint: params.activationPoint,
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-      isLockLiquidity: params.isLockLiquidity,
-    });
-
-    return adaptLegacyPoolResult(
-      result,
-      planSigners(params.payer, params.positionNft),
-    );
+    return await createPoolPlan(params);
   }
 
   async createPosition(params: CreatePositionParams): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "createPosition");
-
-    const transaction = await legacyBridge.createPosition({
-      owner: addressString(params.owner),
-      payer: signerAddress(params.payer),
-      pool: addressString(params.pool),
-      positionNft: signerAddress(params.positionNft),
-    });
-
-    return adaptLegacyTransaction(
-      transaction,
-      planSigners(params.payer, params.positionNft),
-    );
+    return await createPositionPlan(params);
   }
 
   async addLiquidity(params: AddLiquidityParams): Promise<KitTransactionPlan> {
@@ -901,35 +812,6 @@ export class CpAmmKitClient {
   }
 
   async swap2(params: Swap2Params): Promise<KitTransactionPlan> {
-    const legacyBridge = assertLegacyBridge(this.legacyBridge, "swap2");
-
-    const transaction = await legacyBridge.swap2({
-      payer: signerAddress(params.payer),
-      pool: addressString(params.pool),
-      inputTokenMint: addressString(params.inputTokenMint),
-      outputTokenMint: addressString(params.outputTokenMint),
-      tokenAMint: addressString(params.tokenAMint),
-      tokenBMint: addressString(params.tokenBMint),
-      tokenAVault: addressString(params.tokenAVault),
-      tokenBVault: addressString(params.tokenBVault),
-      tokenAProgram: addressString(params.tokenAProgram),
-      tokenBProgram: addressString(params.tokenBProgram),
-      referralTokenAccount: optionalAddressString(params.referralTokenAccount) ?? null,
-      receiver: optionalAddressString(params.receiver),
-      poolState: params.poolState,
-      ...("amountIn" in params
-        ? {
-            swapMode: params.swapMode,
-            amountIn: params.amountIn,
-            minimumAmountOut: params.minimumAmountOut,
-          }
-        : {
-            swapMode: params.swapMode,
-            amountOut: params.amountOut,
-            maximumAmountIn: params.maximumAmountIn,
-          }),
-    });
-
-    return adaptLegacyTransaction(transaction, planSigners(params.payer));
+    return await swap2Plan(this.rpc, params);
   }
 }

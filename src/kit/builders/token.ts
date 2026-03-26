@@ -1,4 +1,5 @@
 import {
+  AccountRole,
   address,
   type Address,
   type Instruction,
@@ -13,6 +14,7 @@ import {
   getCreateAssociatedTokenIdempotentInstructionAsync,
   getSyncNativeInstruction,
 } from "@solana-program/token";
+import { replaceInstructionAccount } from "./common";
 
 export const NATIVE_MINT_ADDRESS = address(
   "So11111111111111111111111111111111111111112",
@@ -102,16 +104,27 @@ export async function prepareTokenAccounts(params: {
 }
 
 export function wrapSolInstructions(
-  source: TransactionSigner,
+  sourceAddress: Address,
+  sourceSigner: TransactionSigner,
   destination: Address,
   amount: bigint,
 ): readonly Instruction[] {
+  const transferInstruction = getTransferSolInstruction({
+    source: sourceSigner,
+    destination,
+    amount,
+  });
+
+  const normalizedTransferInstruction =
+    sourceAddress === sourceSigner.address
+      ? transferInstruction
+      : replaceInstructionAccount(transferInstruction, 0, {
+          address: sourceAddress,
+          role: AccountRole.WRITABLE_SIGNER,
+        });
+
   return [
-    getTransferSolInstruction({
-      source,
-      destination,
-      amount,
-    }),
+    normalizedTransferInstruction,
     getSyncNativeInstruction({
       account: destination,
     }),
@@ -119,18 +132,26 @@ export function wrapSolInstructions(
 }
 
 export async function unwrapSolInstruction(
-  owner: TransactionSigner,
-  receiver: Address = owner.address,
+  ownerAddress: Address,
+  ownerSigner: TransactionSigner,
+  receiver: Address = ownerAddress,
 ): Promise<Instruction> {
   const [wSolAta] = await findAssociatedTokenPda({
-    owner: owner.address,
+    owner: ownerAddress,
     mint: NATIVE_MINT_ADDRESS,
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
 
-  return getCloseAccountInstruction({
+  const instruction = getCloseAccountInstruction({
     account: wSolAta,
     destination: receiver,
-    owner,
+    owner: ownerSigner,
   });
+
+  return ownerAddress === ownerSigner.address
+    ? instruction
+    : replaceInstructionAccount(instruction, 2, {
+        address: ownerAddress,
+        role: AccountRole.READONLY_SIGNER,
+      });
 }
