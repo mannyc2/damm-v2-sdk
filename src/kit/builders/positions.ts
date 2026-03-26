@@ -1,7 +1,7 @@
 import type { Address, Instruction } from "@solana/kit";
 import BN from "bn.js";
 
-import * as legacyKitMath from "../../internal/legacyKitMath";
+import * as kitMath from "../math";
 import type {
   AddLiquidityParams,
   ClosePositionParams,
@@ -69,40 +69,6 @@ function hasNativeMint(poolState: Pick<KitPoolState, "tokenAMint" | "tokenBMint"
     coerceAddress(poolState.tokenAMint) === NATIVE_MINT_ADDRESS ||
     coerceAddress(poolState.tokenBMint) === NATIVE_MINT_ADDRESS
   );
-}
-
-function getAvailableVestingLiquidity(
-  vestingState: RemoveLiquidityParams["vestings"][number]["vestingState"],
-  currentPoint: BN,
-): BN {
-  const {
-    cliffPoint,
-    periodFrequency,
-    cliffUnlockLiquidity,
-    liquidityPerPeriod,
-    numberOfPeriod,
-    totalReleasedLiquidity,
-  } = vestingState.innerVesting;
-
-  if (currentPoint.lt(cliffPoint)) {
-    return new BN(0);
-  }
-
-  if (periodFrequency.isZero()) {
-    return cliffUnlockLiquidity;
-  }
-
-  let passedPeriod = currentPoint.sub(cliffPoint).div(periodFrequency);
-  const maxPeriod = new BN(numberOfPeriod);
-  if (passedPeriod.gt(maxPeriod)) {
-    passedPeriod = maxPeriod;
-  }
-
-  const unlockedLiquidity = cliffUnlockLiquidity.add(
-    passedPeriod.mul(liquidityPerPeriod),
-  );
-
-  return unlockedLiquidity.sub(totalReleasedLiquidity);
 }
 
 async function buildRefreshVestingInstruction(
@@ -738,7 +704,7 @@ export async function closePositionPlan(
 export async function removeAllLiquidityAndClosePositionPlan(
   params: RemoveAllLiquidityAndClosePositionParams,
 ): Promise<KitTransactionPlan> {
-  const { canUnlock, reason } = legacyKitMath.canUnlockPosition(
+  const { canUnlock, reason } = kitMath.canUnlockPosition(
     params.positionState,
     params.vestings,
     params.currentPoint,
@@ -811,7 +777,7 @@ export async function removeAllLiquidityAndClosePositionPlan(
 export async function mergePositionPlan(
   params: MergePositionParams,
 ): Promise<KitTransactionPlan> {
-  const { canUnlock, reason } = legacyKitMath.canUnlockPosition(
+  const { canUnlock, reason } = kitMath.canUnlockPosition(
     params.positionBState,
     params.positionBVestings,
     params.currentPoint,
@@ -844,7 +810,10 @@ export async function mergePositionPlan(
     const totalAvailableVestingLiquidity = params.positionBVestings.reduce(
       (total, vesting) =>
         total.add(
-          getAvailableVestingLiquidity(vesting.vestingState, params.currentPoint),
+          kitMath.getAvailableVestingLiquidity(
+            vesting.vestingState,
+            params.currentPoint,
+          ),
         ),
       new BN(0),
     );
@@ -864,7 +833,7 @@ export async function mergePositionPlan(
     );
   }
 
-  const withdrawQuote = legacyKitMath.getWithdrawQuote({
+  const withdrawQuote = kitMath.getWithdrawQuote({
     liquidityDelta: positionBLiquidityDelta,
     minSqrtPrice: params.poolState.sqrtMinPrice,
     maxSqrtPrice: params.poolState.sqrtMaxPrice,
@@ -875,7 +844,7 @@ export async function mergePositionPlan(
     liquidity: params.poolState.liquidity,
   });
 
-  const newLiquidityDelta = legacyKitMath.getLiquidityDelta({
+  const newLiquidityDelta = kitMath.getLiquidityDelta({
     maxAmountTokenA: withdrawQuote.outAmountA,
     maxAmountTokenB: withdrawQuote.outAmountB,
     sqrtMaxPrice: params.poolState.sqrtMaxPrice,

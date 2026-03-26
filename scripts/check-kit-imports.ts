@@ -16,6 +16,7 @@ const forbiddenRootImports = [
   path.join(repoRoot, "src", "constants"),
   path.join(repoRoot, "src", "helpers"),
   path.join(repoRoot, "src", "index"),
+  path.join(repoRoot, "src", "internal"),
 ];
 
 const importSpecifierPattern =
