@@ -1,4 +1,4 @@
-import BN, { min } from "bn.js";
+import BN from "bn.js";
 
 import type { VestingState } from "./types";
 
@@ -36,7 +36,7 @@ export function getAvailableVestingLiquidity(
   }
 
   let passedPeriod = new BN(currentPoint).sub(cliffPoint).div(periodFrequency);
-  passedPeriod = min(passedPeriod, new BN(numberOfPeriod));
+  passedPeriod = BN.min(passedPeriod, new BN(numberOfPeriod));
 
   const unlockedLiquidity = cliffUnlockLiquidity.add(
     passedPeriod.mul(liquidityPerPeriod),

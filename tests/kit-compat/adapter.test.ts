@@ -675,6 +675,49 @@ describe("CpAmmKitClient Kit parity", () => {
     await validator.stop();
   });
 
+  it("matches legacy pool preparation helpers", async () => {
+    const legacyClient = new CpAmm(validator.connection);
+    const kitClient = CpAmmKitClient.fromRpc(rpcBundle.rpc);
+    const tokenAAmount = new BN(750 * 10 ** DECIMALS);
+    const tokenBAmount = new BN(500 * 10 ** DECIMALS);
+
+    const legacyPrepared = legacyClient.preparePoolCreationParams({
+      tokenAAmount,
+      tokenBAmount,
+      minSqrtPrice: MIN_SQRT_PRICE,
+      maxSqrtPrice: MAX_SQRT_PRICE,
+      collectFeeMode: CollectFeeMode.BothToken,
+    });
+    const kitPrepared = kitClient.preparePoolCreationParams({
+      tokenAAmount,
+      tokenBAmount,
+      minSqrtPrice: MIN_SQRT_PRICE,
+      maxSqrtPrice: MAX_SQRT_PRICE,
+      collectFeeMode: CollectFeeMode.BothToken,
+    });
+
+    expect(normalizeComparable(kitPrepared)).toEqual(
+      normalizeComparable(legacyPrepared),
+    );
+
+    const legacySingleSide = legacyClient.preparePoolCreationSingleSide({
+      tokenAAmount,
+      minSqrtPrice: MIN_SQRT_PRICE,
+      maxSqrtPrice: MAX_SQRT_PRICE,
+      initSqrtPrice: MIN_SQRT_PRICE,
+      collectFeeMode: CollectFeeMode.BothToken,
+    });
+    const kitSingleSide = kitClient.preparePoolCreationSingleSide({
+      tokenAAmount,
+      minSqrtPrice: MIN_SQRT_PRICE,
+      maxSqrtPrice: MAX_SQRT_PRICE,
+      initSqrtPrice: MIN_SQRT_PRICE,
+      collectFeeMode: CollectFeeMode.BothToken,
+    });
+
+    expect(kitSingleSide.toString()).toBe(legacySingleSide.toString());
+  });
+
   it("builds parity plans and executes the pilot methods on a local validator", async () => {
     const actors = await createActors(validator.connection);
     const { tokenAMint, tokenBMint } = await createTokens(
@@ -919,6 +962,60 @@ describe("CpAmmKitClient Kit parity", () => {
     const userTokenBAccount = getAssociatedTokenAddressSync(
       tokenBMint,
       actors.user.publicKey,
+    );
+    expect(await validator.connection.getAccountInfo(userTokenBAccount)).not.toBeNull();
+  });
+
+  it("builds parity plans and executes classic swap", async () => {
+    const fixture = await createCustomPoolFixture(validator, rpcBundle);
+    const legacyPoolState = await fixture.legacyClient.fetchPoolState(
+      fixture.poolAddress,
+    );
+    const legacySwapTx = await fixture.legacyClient.swap({
+      payer: fixture.actors.user.publicKey,
+      pool: fixture.poolAddress,
+      inputTokenMint: legacyPoolState.tokenAMint,
+      outputTokenMint: legacyPoolState.tokenBMint,
+      amountIn: new BN(100 * 10 ** DECIMALS),
+      minimumAmountOut: new BN(0),
+      tokenAMint: legacyPoolState.tokenAMint,
+      tokenBMint: legacyPoolState.tokenBMint,
+      tokenAVault: legacyPoolState.tokenAVault,
+      tokenBVault: legacyPoolState.tokenBVault,
+      tokenAProgram: getTokenProgram(legacyPoolState.tokenAFlag),
+      tokenBProgram: getTokenProgram(legacyPoolState.tokenBFlag),
+      referralTokenAccount: null,
+      poolState: legacyPoolState,
+    });
+    const kitPoolState = await fetchKitPoolState(fixture.kitClient, fixture.poolAddress);
+    const kitSwapPlan = await fixture.kitClient.swap({
+      payer: fixture.actors.userSigner,
+      pool: addressFromPublicKey(fixture.poolAddress),
+      inputTokenMint: addressFromPublicKey(legacyPoolState.tokenAMint),
+      outputTokenMint: addressFromPublicKey(legacyPoolState.tokenBMint),
+      amountIn: new BN(100 * 10 ** DECIMALS),
+      minimumAmountOut: new BN(0),
+      tokenAMint: addressFromPublicKey(legacyPoolState.tokenAMint),
+      tokenBMint: addressFromPublicKey(legacyPoolState.tokenBMint),
+      tokenAVault: addressFromPublicKey(legacyPoolState.tokenAVault),
+      tokenBVault: addressFromPublicKey(legacyPoolState.tokenBVault),
+      tokenAProgram: addressFromPublicKey(
+        getTokenProgram(legacyPoolState.tokenAFlag),
+      ),
+      tokenBProgram: addressFromPublicKey(
+        getTokenProgram(legacyPoolState.tokenBFlag),
+      ),
+      referralTokenAccount: null,
+      poolState: kitPoolState,
+    });
+
+    expectPlanParity(legacySwapTx, kitSwapPlan, [fixture.actors.userSigner.address]);
+
+    await executeKitPlan(kitSwapPlan, fixture.actors.userSigner, rpcBundle);
+
+    const userTokenBAccount = getAssociatedTokenAddressSync(
+      fixture.tokenBMint,
+      fixture.actors.user.publicKey,
     );
     expect(await validator.connection.getAccountInfo(userTokenBAccount)).not.toBeNull();
   });

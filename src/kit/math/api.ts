@@ -1,4 +1,4 @@
-import BN, { min } from "bn.js";
+import BN from "bn.js";
 
 import type {
   KitDepositQuote,
@@ -90,7 +90,7 @@ export function getLiquidityDelta(params: KitLiquidityDeltaParams): BN {
     params.liquidity,
   );
 
-  return min(liquidityDeltaFromAmountA, liquidityDeltaFromAmountB);
+  return BN.min(liquidityDeltaFromAmountA, liquidityDeltaFromAmountB);
 }
 
 export function preparePoolCreationSingleSide(
@@ -168,7 +168,7 @@ export function preparePoolCreationParams(
 
   return {
     initSqrtPrice,
-    liquidityDelta: min(liquidityDeltaFromAmountA, liquidityDeltaFromAmountB),
+    liquidityDelta: BN.min(liquidityDeltaFromAmountA, liquidityDeltaFromAmountB),
   };
 }
 
